@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with cardo  -->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink">
+    <image xlink:href="./my_study/scenario1/experiment1/growth_profile.png"
+       width="225" height="405" x="0" y="0" id="image1"/>
+    <image xlink:href="./my_study/scenario2/experiment1/growth_profile.png"
+       width="225" height="405" x="225" y="0" id="image2"/>
+    <image xlink:href="./my_study/scenario1/experiment2/growth_profile.png"
+       width="225" height="405" x="0" y="405" id="image3"/>
+    <image xlink:href="./my_study/scenario2/experiment2/growth_profile.png"
+       width="225" height="405" x="225" y="405" id="image4"/>
+    <image xlink:href="./my_study/scenario1/experiment3/growth_profile.png"
+       width="225" height="405" x="0" y="810" id="image5"/>
+    <image xlink:href="./my_study/scenario1/experiment3/growth_profile.png"
+       width="225" height="405" x="225" y="810" id="image6"/>
+    <text style="font-size:40px;" x="15" y="-20" id="text1">scenario1</text>
+    <text style="font-size:40px;" x="240" y="-20" id="text2">scenario2</text>
+    <text style="font-size:40px;" x="-300" y="217" id="text3">experiment1</text>
+    <text style="font-size:40px;" x="-300" y="618" id="text4">experiment2</text>
+    <text style="font-size:40px;" x="-300" y="1023" id="text5">experiment3</text>
+</svg>
