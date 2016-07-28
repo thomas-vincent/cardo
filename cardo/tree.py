@@ -1,14 +1,14 @@
 import os
 import os.path as op
-from itertools import izip
 import re
-import numpy as np
 from pprint import pformat
-import itertools
+from itertools import izip, cycle
+import logging
+
+import numpy as np
 import svgwrite
 
-import graphics
-import logging
+from cardo import graphics
 
 logger = logging.getLogger('cardo')
 
@@ -63,7 +63,8 @@ def dtree_from_folder(startpath, file_pattern, max_depth=-1):
     """
     tree = {}
 
-    try: file_pattern.match('')
+    try:
+        file_pattern.match('')
     except AttributeError:
         file_pattern = re.compile(file_pattern)
 
@@ -81,8 +82,8 @@ def dtree_from_folder(startpath, file_pattern, max_depth=-1):
         else:
             branches = rel_path_parts
             
-        if (max_depth!=-1 and depth==max_depth) or \
-           len(dirs)==0:
+        if (max_depth !=- 1 and depth == max_depth) or \
+           len(dirs) == 0:
             logger.info('Maximum depth reached')
                         
             # No more subfolders available or given max depth is reached
@@ -99,15 +100,15 @@ def dtree_from_folder(startpath, file_pattern, max_depth=-1):
             # print pformat(tree)
             # print ''
 
-            if len(branches) == 0 and len(bfiles)==0:
+            if len(branches) == 0 and len(bfiles) == 0:
                 raise Exception('Data tree cannot be built from one single file')
 
-            def make_path(fn):
-                return op.join(op.relpath(root, startpath), fn)
+            def make_path(fn, rdir):
+                return op.join(op.relpath(rdir, startpath), fn)
 
             if isinstance(tfiles, str):
                 logger.info('Found 1 file matching regexp: %s', tfiles)
-                tfiles = make_path(tfiles)
+                tfiles = make_path(tfiles, root)
                 set_tree_leaf(tree, branches, tfiles)
             else: # dict tree
                 if logger.isEnabledFor(logging.INFO):
@@ -131,7 +132,7 @@ def dtree_from_folder(startpath, file_pattern, max_depth=-1):
                     logger.warning(msg)
                     #raise NonMatchingFilePattern(msg)
                 else:
-                    tfiles = apply_to_leaves(tfiles, make_path)
+                    tfiles = apply_to_leaves(tfiles, make_path, root)
                     for bf,fn in tree_items_iterator(tfiles):
                         set_tree_leaf(tree, branches+bf, fn)
                 
@@ -140,27 +141,27 @@ def dtree_from_folder(startpath, file_pattern, max_depth=-1):
     return dtree_check(tree), bfiles
 
 
-def apply_to_leaves(tree, func, funcArgs=None, funcKwargs=None):
+def apply_to_leaves(tree, func, func_args=None, func_kwargs=None):
     """
     Apply function 'func' to all leaves in given 'tree' and return a new tree.
     """
-    if funcKwargs is None:
-        funcKwargs = {}
-    if funcArgs is None:
-        funcArgs = []
+    if func_kwargs is None:
+        func_kwargs = {}
+    if func_args is None:
+        func_args = []
 
     newTree = tree.__class__()  # could be dict or {}
     for branch, leaf in tree_items_iterator(tree):
-        set_tree_leaf(newTree, branch, func(leaf, *funcArgs, **funcKwargs))
+        set_tree_leaf(newTree, branch, func(leaf, *func_args, **func_kwargs))
     return newTree
 
 class WrongDataTreeLevel(Exception):
 
     def __init__(self, message, wrong_level_idx, ref_lvl, wrong_lvl):
-            super(WrongDataTreeLevel, self).__init__(message)
-            self.wrong_level_idx = wrong_level_idx
-            self.ref_lvl = ref_lvl
-            self.wrong_lvl = wrong_lvl
+        super(WrongDataTreeLevel, self).__init__(message)
+        self.wrong_level_idx = wrong_level_idx
+        self.ref_lvl = ref_lvl
+        self.wrong_lvl = wrong_lvl
             
 class WrongDataTreeLeaf(Exception):
     pass
@@ -241,9 +242,9 @@ def make_headers(row_levels, col_levels):
     def mk_hdr_btexts(levels):        
         hdr_btexts = []
         cum_prod = 1
-        for ilvl, lvl in enumerate(levels):
+        for lvl in levels:
             cum_prod *= len(lvl)
-            clvl = itertools.cycle(sorted(lvl))
+            clvl = cycle(sorted(lvl))
             btexts = []
             for i in xrange(cum_prod):
                 logger.debug('i=%d', i)
@@ -317,7 +318,7 @@ def dtree_to_svg(dtree, root_path, branch_names, row_branches, column_branches,
         if isinstance(elem, graphics.Spacer): # spacer
             # Add a full row of spacers
             sp_h = elem.get_box_width()
-            for icol, btext in enumerate(col_hdr_btexts[-1]):
+            for icol in xrange(len(col_hdr_btexts[-1])):
                 all_bimgs[irow, icol] = graphics.Spacer(height=sp_h)
         else:
             # interleave spacers between columns
@@ -327,7 +328,7 @@ def dtree_to_svg(dtree, root_path, branch_names, row_branches, column_branches,
                     all_bimgs[irow, icol] = graphics.Spacer(width=ew)
                 else:
                     bimg = graphics.BoxedImage(op.join(root_path, img_it.next()),
-                                        img_h=img_h)
+                                               img_h=img_h)
                     all_bimgs[irow, icol] = bimg
             
     bimgs_array = np.array(all_bimgs)

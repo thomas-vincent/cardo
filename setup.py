@@ -13,7 +13,7 @@ with open(op.join(here, 'README.md')) as f:
 
 setup(name='cardo', version=__version__,
       description='Make table reporting folders organized as a UB-tree',
-      long_description=long_description, author='Thomas Vincent', licence='MIT',
+      long_description=long_description, author='Thomas Vincent', license='MIT',
       classifiers=['Development Status :: 2 - Pre-Alpha',
                    'Intended Audience :: Science/Research',
                    'License :: OSI Approved :: MIT License',
@@ -24,7 +24,7 @@ setup(name='cardo', version=__version__,
                    'Programming Language :: Python :: 2.7',
                    'Topic :: Multimedia :: Graphics :: Presentation',
                    'Topic :: Scientific/Engineering :: Visualization'],
-      keyword='cardo reporting SVG',
+      keywords='cardo reporting SVG',
       packages=find_packages(exclude=['misc', 'test']),
       install_requires=['svgwrite', 'numpy'],
       entry_points={

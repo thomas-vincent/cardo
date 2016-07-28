@@ -1,8 +1,13 @@
-import tree
+"""
+Main cardo module with top-level functions to produce automatic table reporting
+from a collection of images organized in a UB-tree-like folder hierarchy.
+
+Inputs are files + option layout and outputs are SVG table documents.
+"""
 import logging
+from cardo import tree
 
 TABLE_OPT_WIDTH_TO_HEIGHT_RATIO = 1 / (2**.5)
-
 logger = logging.getLogger('cardo')
 
 def make_table_from_folder(data_path, data_file_pattern, max_depth=-1,
@@ -26,15 +31,15 @@ def make_table_from_folder(data_path, data_file_pattern, max_depth=-1,
                     |   |   `-- data_t2.png
                     |   `-- ...
                     `-- level1_val12
-                        |-- level2_val21   
-                        |   `-- data_t1.png  
+                        |-- level2_val21
+                        |   `-- data_t1.png
                         |   `-- data_t2.png
-                        |-- level2_val22   
-                        |   `-- data_t1.png  
+                        |-- level2_val22
+                        |   `-- data_t1.png
                         |   `-- data_t2.png
                         `-- ...
              which represents a tree with 3 levels:
-                  - lvl1_val1, lvl1_val2 
+                  - lvl1_val1, lvl1_val2
                   - lvl2_val1, lvl2_val2
                   - data_t1, data_t2
         - data_file_pattern (str | _sre.SRE_Pattern):
@@ -59,7 +64,7 @@ def make_table_from_folder(data_path, data_file_pattern, max_depth=-1,
     #TODO: check consistency between given branch names and
     #      retrieved ones
     """
-    level_names =  level_names or []
+    level_names = level_names or []
 
     # Walk given folder and build data tree
     dtree, dfiles_bnames = tree.dtree_from_folder(data_path, data_file_pattern,
@@ -75,7 +80,7 @@ def make_table_from_folder(data_path, data_file_pattern, max_depth=-1,
                         for i in range(dtree_depth-len(dfiles_bnames))]
     
     level_names.extend(dfiles_bnames)
-        
+    
     assert len(level_names) == dtree_depth
 
     if row_levels is None:
@@ -121,12 +126,22 @@ def opt_row_col_levels(dtree, level_names=None):
         [level_names[i] for i in opt_cols]
 
 def bipartition_it(elements):
+    """ 
+    Return all possible 2-set partitions of the given set of elements
+
+    Args:
+        - elements (list):
+          set of elements to split in two
+   
+    Outputs: iterator over a tuple of 2 lists.
+        Each list is a subset of elements
+    """
     def _bpart_rec(elems, set1, set2):
         if len(set1) + len(set2) < len(elements):
-            for s1,s2 in _bpart_rec(elems[1:], set1 + [elems[0]], set2):
-                yield s1, s2
-            for s1,s2 in _bpart_rec(elems[1:], set1, set2 + [elems[0]]):
-                yield s1, s2
+            for sub_s1, sub_s2 in _bpart_rec(elems[1:], set1 + [elems[0]], set2):
+                yield sub_s1, sub_s2
+            for sub_s1, sub_s2 in _bpart_rec(elems[1:], set1, set2 + [elems[0]]):
+                yield sub_s1, sub_s2
         else:
             yield set1, set2
     return _bpart_rec(elements, [], [])

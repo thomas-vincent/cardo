@@ -1,7 +1,8 @@
-from optparse import OptionParser
-import cardo
 import re
 import logging
+from optparse import OptionParser
+
+import cardo
 
 logger = logging.getLogger('cardo')
 
@@ -93,13 +94,13 @@ def main():
         return 1
     
     svg_table = cardo.make_table_from_folder(data_path, fn_reg_exp,
-                                             branch_names=options.sublevel_names,
+                                             level_names=options.sublevel_names,
                                              row_levels=options.rows,
                                              column_levels=options.columns)
 
     if options.output_file is not None:
         # Save SVG document
-        with open(options.output_file, 'w') as f:
-            f.write(svg_table)
+        with open(options.output_file, 'w') as fout:
+            fout.write(svg_table)
     else:
         print svg_table
