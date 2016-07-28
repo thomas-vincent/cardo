@@ -265,8 +265,9 @@ def get_image_size(fname):
 
 def adjust_table_sizes(row_hdr_btexts, col_hdr_btexts, bimgs):
    
-    # Get adjusted sizes from column header:
-    adjust_hdr(row_hdr_btexts + [list(bimgs[:, 0])], use_height_for_last_line=True)
+    # adjust sizes from headers:
+    adjust_hdr(row_hdr_btexts + [list(bimgs[:, 0])],
+               use_height_for_last_line=True)
     adjust_hdr(col_hdr_btexts + [list(bimgs[0, :])])
 
     # Adjust spacers

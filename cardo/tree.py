@@ -303,9 +303,12 @@ def dtree_to_svg(dtree, root_path, branch_names, row_branches, column_branches,
 
     See 'dtree_to_table_elements' for doc on arguments
     """
-    return table_elements_to_svg(*dtree_to_table_elements(dtree, root_path, branch_names,
-                                                          row_branches, column_branches,
-                                                          row_base_gap, col_base_gap))
+    return table_elements_to_svg(*dtree_to_table_elements(dtree, root_path,
+                                                          branch_names,
+                                                          row_branches,
+                                                          column_branches,
+                                                          row_base_gap,
+                                                          col_base_gap))
 
 
 def table_elements_to_svg(column_header, row_header, grid_imgs):
@@ -350,8 +353,9 @@ def table_elements_to_svg(column_header, row_header, grid_imgs):
     return dwg.tostring()
 
 
-def dtree_to_table_elements(dtree, root_path, branch_names, row_branches, column_branches,
-                            row_base_gap=DEFAULT_ROW_BGAP, col_base_gap=DEFAULT_COL_BGAP):
+def dtree_to_table_elements(dtree, root_path, branch_names, row_branches,
+                            column_branches, row_base_gap=DEFAULT_ROW_BGAP,
+                            col_base_gap=DEFAULT_COL_BGAP):
     """
     Convert a data tree to a table of images with column and row headers
 
