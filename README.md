@@ -44,7 +44,7 @@ prints a SVG document representing the table:
 | experiment2  | ![growth_profile][growth] | ![growth_profile][growth] |
 | experiment3  | ![growth_profile][growth] | ![growth_profile][growth] |
 
-[growth]: https://upload.wikimedia.org/wikipedia/commons/0/04/1328101942_Arrow-Up.png
+[growth]: https://github.com/thomas-vincent/cardo/blob/master/doc/images/growth.png
 
 The table layout can be customized:
 ```{r, engine='shell', count_lines}
