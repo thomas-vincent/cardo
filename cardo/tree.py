@@ -12,11 +12,17 @@ from cardo import graphics
 
 logger = logging.getLogger('cardo')
 
+
+DEFAULT_ROW_BGAP = 0.05 # 5% of image width
+DEFAULT_COL_BGAP = 0.025 # 2.5% of image height
+
 class InconsistentFileGroup(Exception):
     pass
 
 class NonMatchingFilePattern(Exception):
     pass
+
+
 
 def file_list_to_tree(files, file_pat):
 
@@ -94,12 +100,6 @@ def dtree_from_folder(startpath, file_pattern, max_depth=-1):
             #       -> better to unify
             tfiles, bfiles = file_list_to_tree(files, file_pattern)
 
-            # print 'tfiles:', pformat(tfiles)
-            # print 'bfiles:', pformat(bfiles)
-            # print 'actual tree:'
-            # print pformat(tree)
-            # print ''
-
             if len(branches) == 0 and len(bfiles) == 0:
                 raise Exception('Data tree cannot be built from one single file')
 
@@ -132,7 +132,7 @@ def dtree_from_folder(startpath, file_pattern, max_depth=-1):
                     logger.warning(msg)
                     #raise NonMatchingFilePattern(msg)
                 else:
-                    tfiles = apply_to_leaves(tfiles, make_path, root)
+                    tfiles = apply_to_leaves(tfiles, make_path, (root,))
                     for bf,fn in tree_items_iterator(tfiles):
                         set_tree_leaf(tree, branches+bf, fn)
                 
@@ -187,7 +187,6 @@ def dtree_get_levels(data_tree):
             return levels + [t.keys()]
     return _get_levels(data_tree, [])
     
-
 def dtree_check(data_tree):
     """
     Ensure that given tree is a data tree: all non-leaf nodes at any 
@@ -296,9 +295,69 @@ def space_headers(row_hdr_btexts, row_levels, row_base_gap,
             for hdr, lvls, gap in ((row_hdr_btexts, row_levels, row_base_gap),
                                    (col_hdr_btexts, col_levels, col_base_gap)))
 
+
 def dtree_to_svg(dtree, root_path, branch_names, row_branches, column_branches,
-                 row_base_gap=2, col_base_gap=2):
-    # Reshape tree to match target row and column axes 
+                 row_base_gap=DEFAULT_ROW_BGAP, col_base_gap=DEFAULT_COL_BGAP):
+    """
+    Helper function to directly convert a dtree to a SVG string representation
+
+    See 'dtree_to_table_elements' for doc on arguments
+    """
+    return table_elements_to_svg(*dtree_to_table_elements(dtree, root_path, branch_names,
+                                                          row_branches, column_branches,
+                                                          row_base_gap, col_base_gap))
+
+
+def table_elements_to_svg(column_header, row_header, grid_imgs):
+    """
+    Return a SVG representation of the given table elements
+
+    Output (str): SVG representation
+    TODO: doc, test, implement
+    """
+    dwg = svgwrite.Drawing()
+    table_group = svgwrite.container.Group(id='table')
+    
+    col_hdr_group = svgwrite.container.Group(id='table_col_hdr')
+    for col_hdr_line in column_header:
+        for element in col_hdr_line:
+            col_hdr_group.add(element.to_svg())            
+    table_group.add(col_hdr_group)
+
+    row_hdr_group = svgwrite.container.Group(id='table_row_hdr')
+    for row_hdr_line in row_header:
+        for element in row_hdr_line:
+            row_hdr_group.add(element.to_svg())
+
+    # translate row hdr so that its bottom left corner is
+    # on the bottom left corner of the image grid
+    img_bot_y = row_header[-1][0].get_box_bot_y()
+    dy = grid_imgs[-1,0].get_box_bot_y() - img_bot_y
+    row_hdr_group.translate(tx=0,ty=dy)
+
+    # rotate row hdr by 90 deg. around the bottom left corner of the image grid
+    rot_ctr = (0, img_bot_y)
+    row_hdr_group.rotate(-90, center=rot_ctr)    
+    table_group.add(row_hdr_group)
+    
+    img_group = svgwrite.container.Group(id='table_content')
+    for row_imgs in grid_imgs:
+        for img in row_imgs:
+            img_group.add(img.to_svg())
+    table_group.add(img_group)
+
+    dwg.add(table_group)
+    return dwg.tostring()
+
+
+def dtree_to_table_elements(dtree, root_path, branch_names, row_branches, column_branches,
+                            row_base_gap=DEFAULT_ROW_BGAP, col_base_gap=DEFAULT_COL_BGAP):
+    """
+    Convert a data tree to a table of images with column and row headers
+
+    TODO: doc, test, implement
+    """
+        # Reshape tree to match target row and column axes 
     dtree = tree_rearrange(dtree, branch_names, row_branches + column_branches)
     levels = dtree_get_levels(dtree)
 
@@ -334,60 +393,14 @@ def dtree_to_svg(dtree, root_path, branch_names, row_branches, column_branches,
     bimgs_array = np.array(all_bimgs)
     bimgs_array = bimgs_array.reshape(len(row_hdr_btexts[-1]),
                                       len(col_hdr_btexts[-1]))
-    # print 'bimgs_array.shape:', bimgs_array.shape
     
     # Adjust sizes of elements to avoid truncation 
     graphics.adjust_table_sizes(row_hdr_btexts, col_hdr_btexts, bimgs_array)
     # Position all elements 
     graphics.arrange_table(row_hdr_btexts, col_hdr_btexts, bimgs_array)
 
-    # Flatten every part of the table (row hdr, col hdr and img grid)
-    # -> will be easer to put into SVG groups
+    return col_hdr_btexts, row_hdr_btexts, bimgs_array
 
-
-    # Put everything in a svg document
-    # Apply 90 deg. rotation + translation to the column header    
-    # Apply global translation to put elements in their right position
-    # relative to top-left corner (which is point (0,0))
-    
-    # svg_doc = create_empty_svg_doc()
-    # col_hdr_w, col_hdr_h = add_column_headers(svg_doc, column_branches,
-    #                                           col_levels)
-    # row_hdr_w, row_hrd_h = add_row_headers(svg_doc, row_branches, row_levels)
-
-    dwg = svgwrite.Drawing()
-    table_group = svgwrite.container.Group(id='table')
-    
-    col_hdr_group = svgwrite.container.Group(id='table_col_hdr')
-    for col_hdr_line in col_hdr_btexts:
-        for element in col_hdr_line:
-            col_hdr_group.add(element.to_svg())            
-    table_group.add(col_hdr_group)
-
-    row_hdr_group = svgwrite.container.Group(id='table_row_hdr')
-    for row_hdr_line in row_hdr_btexts:
-        for element in row_hdr_line:
-            row_hdr_group.add(element.to_svg())
-
-    # translate row hdr so that its bottom left corner is
-    # on the bottom left corner of the image grid
-    img_bot_y = row_hdr_btexts[-1][0].get_box_bot_y()
-    dy = bimgs_array[-1,0].get_box_bot_y() - img_bot_y
-    row_hdr_group.translate(tx=0,ty=dy)
-
-    # rotate row hdr by 90 deg. around the bottom left corner of the image grid
-    rot_ctr = (0, img_bot_y)
-    row_hdr_group.rotate(-90, center=rot_ctr)    
-    table_group.add(row_hdr_group)
-    
-    img_group = svgwrite.container.Group(id='table_content')
-    for row_imgs in bimgs_array:
-        for img in row_imgs:
-            img_group.add(img.to_svg())
-    table_group.add(img_group)
-
-    dwg.add(table_group)
-    return dwg.tostring()
 
 
 def get_tree_leaf(element, branch):

@@ -376,6 +376,7 @@ class GraphicsTest(CardoTest):
         fpat = 'side_(?P<side>(?:left|right))_(?P<stim_name>stim_[0-9]).png'
         #logger.setLevel(logging.DEBUG)
         svg = cardo.make_table_from_folder(self.tmp_dir, fpat)
+        
         #TODO: check SVG
 
     def test_adjust_hdr(self):
