@@ -6,7 +6,8 @@ import logging
 logger = logging.getLogger('cardo')
 
 def main():
-        
+    #TODO add command unit test
+    
     min_args = 2
     max_args = 2
     
@@ -58,7 +59,7 @@ def main():
                            'It is defined a fraction of the 1st image width.')
 
     parser.add_option('-h', '--row-gap-increment', metavar='NUMBER',
-                      type=check_fraction(), default=.025,
+                      type=check_fraction, default=.025,
                       help='Set the row spacing between levels.' \
                            'Gap is increased by this increment from the '\
                            'bottom to the top level, starting from 0.'\
