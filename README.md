@@ -11,7 +11,7 @@ gathers results and displays them in an n-dimensional table.
 
 For example, say the images are stored in the following folders
 and subsolders:
-
+```
 `-- my_study
     |-- scenario1
     |   |-- experiment1
@@ -27,7 +27,7 @@ and subsolders:
         |   `-- growth_profile.png
         `-- experiment3
             `-- growth_profile.png
-   
+```
 
 Here the features are: scenario and experiment. For each combination of feature
 values, there is a growth profile picture.
@@ -38,73 +38,32 @@ Calling:
 
 produces the svg document './my_study.svg' with the following content:
 
+|              |       scenario1           |     scenario2             |  
+|:------------:|:-------------------------:|:-------------------------:|
+| experiment1  | ![growth_profile][growth] | ![growth_profile][growth] |
+| experiment2  | ![growth_profile][growth] | ![growth_profile][growth] |
+| experiment3  | ![growth_profile][growth] | ![growth_profile][growth] |
 
-                    scenario1                scenario2        
-                                                              
-             +----------------------+ +----------------------+
-             |                      | |                      |
-             |                      | |                      |
-             |  growth_profile.png  | |  growth_profile.png  |
-experiment1  |  for scenario1 and   | |  for scenario2 and   |
-             |  experiment1         | |  experiment1         |
-             |                      | |                      |
-             |                      | |                      |
-             +----------------------+ +----------------------+
-
-             +----------------------+ +----------------------+
-             |                      | |                      |
-             |                      | |                      |
-             |  growth_profile.png  | |  growth_profile.png  |
-experiment2  |  for scenario1 and   | |  for scenario2 and   |
-             |  experiment2         | |  experiment2         |
-             |                      | |                      |
-             |                      | |                      |
-             +----------------------+ +----------------------+
-
-             +----------------------+ +----------------------+
-             |                      | |                      |
-             |                      | |                      |
-             |  growth_profile.png  | |  growth_profile.png  |
-experiment3  |  for scenario1 and   | |  for scenario2 and   |
-             |  experiment3         | |  experiment3         |
-             |                      | |                      |
-             |                      | |                      |
-             +----------------------+ +----------------------+
-
+[growth]: https://upload.wikimedia.org/wikipedia/commons/0/04/1328101942_Arrow-Up.png
 
 The table layout can be customized:
-   $ cardo ./my_study --row_features=1 --col_features=2
-
+```{r, engine='shell', count_lines}
+cardo ./my_study --row_features=1 --col_features=2
+```
 where --row_features=1 sets the first level of folders (scenario) as rows
 and --col_features=2 sets the second level of folders (experiment) as columns.
 
 The following layout is produced:
 
-                    experiment1              experiment2             experiment3  
-                                                              
-             +----------------------+ +----------------------+ +----------------------+ 
-             |                      | |                      | |                      | 
-             |                      | |                      | |                      | 
-             |  growth_profile.png  | |  growth_profile.png  | |  growth_profile.png  | 
-scenario1    |  for scenario1 and   | |  for scenario1 and   | |  for scenario1 and   | 
-             |  experiment1         | |  experiment2         | |  experiment3         | 
-             |                      | |                      | |                      | 
-             |                      | |                      | |                      | 
-             +----------------------+ +----------------------+ +----------------------+
-                                                               
-             +----------------------+ +----------------------+ +----------------------+
-             |                      | |                      | |                      |
-             |                      | |                      | |                      |
-             |  growth_profile.png  | |  growth_profile.png  | |  growth_profile.png  |
-scenario2    |  for scenario2 and   | |  for scenario1 and   | |  for scenario2 and   |
-             |  experiment1         | |  experiment2         | |  experiment3         |
-             |                      | |                      | |                      |
-             |                      | |                      | |                      |
-             +----------------------+ +----------------------+ +----------------------+
+|              |       experiment1         |     experiment1           |     experiment1           |  
+|:------------:|:-------------------------:|:-------------------------:|:-------------------------:|
+| scenario1    | ![growth_profile][growth] | ![growth_profile][growth] | ![growth_profile][growth] |
+| scenario2    | ![growth_profile][growth] | ![growth_profile][growth] | ![growth_profile][growth] |
              
              
 Installation
 ------------
 
+```{r, engine='shell', count_lines}
 python setup.py install
-
+```
