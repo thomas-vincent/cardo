@@ -1,5 +1,7 @@
 [![Build Status](https://travis-ci.org/thomas-vincent/cardo.svg?branch=master)](https://travis-ci.org/thomas-vincent/cardo)
 
+[![Coverage Status](https://coveralls.io/repos/github/thomas-vincent/cardo/badge.svg?branch=master)](https://coveralls.io/github/thomas-vincent/cardo?branch=master)
+
 Description
 -----------
 
