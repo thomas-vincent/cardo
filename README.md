@@ -36,7 +36,7 @@ Calling:
 
     $ cardo ./my_study
 
-produces the svg document './my_study.svg' with the following content:
+prints a SVG document representing the table:
 
 |              |       scenario1           |     scenario2             |  
 |:------------:|:-------------------------:|:-------------------------:|
@@ -50,8 +50,8 @@ The table layout can be customized:
 ```{r, engine='shell', count_lines}
 cardo ./my_study --row_features=1 --col_features=2
 ```
-where --row_features=1 sets the first level of folders (scenario) as rows
-and --col_features=2 sets the second level of folders (experiment) as columns.
+where `--row_features=1` sets the first level of folders (scenario) as rows
+and `--col_features=2` sets the second level of folders (experiment) as columns.
 
 The following layout is produced:
 
