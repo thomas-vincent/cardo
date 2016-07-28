@@ -52,7 +52,7 @@ def main():
 
     #TODO implement gaps
     parser.add_option('-g', '--column-gap-increment', metavar='NUMBER',
-                      type=check_fraction(), default=.05,
+                      type=check_fraction, default=.05,
                       help='Set the column spacing between levels.' \
                            'Gap is increased by this increment from the '\
                            'bottom to the top level, starting from 0.'\
