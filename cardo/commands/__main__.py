@@ -28,8 +28,9 @@ def main():
                            '30 (WARNING), '\
                            '20 (INFO), '\
                            '10 (DEBUG)')
-    def check_fraction(n):
-        return n >= 0 and n <= 1
+    
+    def check_fraction(value):
+        return value >= 0 and value <= 1
     
     def strsplit(option, opt_str, value, parser):
         setattr(parser.values, option.dest, value.split(','))
@@ -52,14 +53,14 @@ def main():
 
     #TODO implement gaps
     parser.add_option('-g', '--column-gap-increment', metavar='NUMBER',
-                      type=check_fraction, default=.05,
+                      type='float', default=.05,
                       help='Set the column spacing between levels.' \
                            'Gap is increased by this increment from the '\
                            'bottom to the top level, starting from 0.'\
                            'It is defined a fraction of the 1st image width.')
 
-    parser.add_option('-h', '--row-gap-increment', metavar='NUMBER',
-                      type=check_fraction, default=.025,
+    parser.add_option('-a', '--row-gap-increment', metavar='NUMBER',
+                      type='float', default=.025,
                       help='Set the row spacing between levels.' \
                            'Gap is increased by this increment from the '\
                            'bottom to the top level, starting from 0.'\
@@ -80,6 +81,17 @@ def main():
     data_path, fn_reg_exp = args
 
     fn_reg_exp = re.compile(fn_reg_exp)
+
+    if not check_fraction(options.column_gap_increment):
+        print 'Wront value for option --column-gap-increment'
+        parser.print_help()
+        return 1
+
+    if not check_fraction(options.row_gap_increment):
+        print 'Wront value for option --row-gap-increment'
+        parser.print_help()
+        return 1
+    
     svg_table = cardo.make_table_from_folder(data_path, fn_reg_exp,
                                              branch_names=options.sublevel_names,
                                              row_levels=options.rows,
