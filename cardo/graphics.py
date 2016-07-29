@@ -4,10 +4,15 @@ import struct
 import math
 from pprint import pformat
 import logging
+from itertools import chain
 
 import svgwrite
 
 logger = logging.getLogger('cardo')
+
+
+class ImageFileNotFound(Exception):
+    pass
 
 class BoxedElement(object):
 
@@ -204,6 +209,9 @@ class BoxedImage(BoxedRect):
     def __init__(self, img_fn, box_x=0, box_y=0, img_w=None, img_h=None,
                  halign=BoxedRect.HALIGN_CENTER, valign=BoxedRect.VALIGN_CENTER):
 
+        if not op.exists(img_fn):
+            raise ImageFileNotFound()
+        
         self.img_fn = img_fn
 
         img_orig_w, img_orig_h = get_image_size(img_fn)
@@ -419,94 +427,161 @@ def adjust_hdr(hdr, use_height_for_last_line=False):
         _adjust_cell(0, i)
                
 
-# class SizeTree(object):
+class GTree(object):
+    """
+    Tree of graphic elements which handles balanced resizing 
+    and insertion of spacers 
+    """
 
-#     sizes = {}
-   
-#     def __init__(self, level, size=0., children=None, parent=None):
-#         self.parent = parent
-#         self.level = level
-       
-#         self.update_level_size(size)
+    def __init__(self, gfx_element, children=None, parent=None):
+        self.gfx_element = gfx_element
 
-#         self.children = children
-#         if self.children is None:
-#             self.children = []
+        self.children = children
+        if self.children is None:
+            self.children = []
 
-#         if self.parent is not None:
-#             self.parent.add_child(self)
-#             assert parent.get_level() == level - 1
-           
-#         for child in self.children:
-#             child.set_parent(self)
-#             assert child.get_level() == level + 1
+        self.parent = parent
 
-#     @staticmethod
-#     def reset_sizes():
-#         SizeTree.sizes = {}
-       
-#     def get_level(self):
-#         return self.level
-           
-#     def __repr__(self):
-#         return '[l' + str(self.level) + 's' + str(self.get_size()) + ']'
+    def __repr__(self):
+        return self.gfx_element.__repr__()
 
-#     def add_child(self, c):
-#         self.children.append(c)
-       
-#     def set_parent(self, p):
-#         self.parent = p
-           
-#     def get_size(self):
-#         return SizeTree.sizes[self.level]
+    def set_parent(self, parent):
+        self.parent = parent
+        
+    def add_child(self, child):
+        self.children.append(child)
 
-#     def set_size(self, size):
-#         SizeTree.sizes[self.level] = size
+    def is_leaf(self):
+        return len(self.children) == 0
+        
+    def get_height(self):
+        if self.is_leaf():
+            return 0
+        else:
+            return max(child.get_height()+1 for child in self.children)
+        
+    @staticmethod
+    def from_hdr_and_images(hdr_levels, images):
+        """
+        Build a GTree from header levels and the grid of images
 
-#     def update_level_size(self, size):
-#         if SizeTree.sizes.get(self.level, 0) < size:
-#             SizeTree.sizes[self.level] = size
-       
-#     def get_children(self):
-#         return self.children
+        Args:
+            - hdr_levels (list of list of str):
+                header level elements, eg:
+                   [['lvl1_item1', 'lvl1_item2, ...],
+                    ['lvl2_item1', 'lvl1_item1, ...],
+                    ...]
+            - images (list of list of BoxedImage):
+                 2d array of image elements. Row size must equal
+                 the cartesian product of hdr_levels
+        """
+        def leaf_img_trees():
+            for icol in xrange(len(images[0])):
+                col_root = GTree(images[0][icol])
+                cur_node = col_root
+                for irow in xrange(1, len(images)):
+                    next_child = GTree(images[0][icol], parent=cur_node)
+                    cur_node.add_child(next_child)
+                    cur_node = next_child
+                yield col_root
+        img_col_tree_iterator = leaf_img_trees()
+        
+        root = GTree(None)
+        def _create_levels_rec(node, levels):
+            if len(levels) == 0:
+                return
+            for element in levels[0]:
+                element = BoxedText(element)
+                new_child = GTree(element, parent=node)
+                node.add_child(new_child)
+                _create_levels_rec(new_child, levels[1:])
+            if len(levels) == 1:
+                for child in node.children:
+                    img_tree = img_col_tree_iterator.next()
+                    img_tree.set_parent(child)
+                    child.add_child(img_tree)
+        _create_levels_rec(root, hdr_levels)
+        return root
 
-#     def adjust(self, parent_size=0):
-#         nchilds = len(self.children)
-#         child_extent = sum([c.adjust(self.get_size()/nchilds) \
-#                             for c in self.children])
-#         self.set_size(max((child_extent, parent_size, self.get_size())))
-#         return self.get_size()
-       
-    # def adjust_to_siblings(self):
-    #     """ Adjust sizes via breadth first search """
-    #     def _bfs(tree, level):
-    #         yield (tree, level)
-    #         last = tree
-    #         for sibling,level in _bfs(tree, level+1):
-    #             for child in sibling.get_children():
-    #                 yield (child, level)
-    #                 last = child
-    #             if last == sibling:
-    #                 return
+    def add_spacers(self, base_gap, create_spacer, nb_levels_to_space):
+        
+        def _append_last_spacer(node, _height):
+            logger.debug('_append_last_spacer: height=%d, node: %s',
+                         _height, str(node))
+            if node.is_leaf():
+                return
+            ref_element = node.children[-1].gfx_element
+            new_node = GTree(create_spacer(_height * base_gap, ref_element),
+                             parent=node)
+            node.add_child(new_node)
+            _append_last_spacer(node.children[-1], _height)
+            
+        def _space_rec(node, _height):
+            logger.debug('_space_rec: height=%d, node: %s', _height, str(node))
+            if node.is_leaf():
+                return
+            new_children = []
+            for child in node.children[:-1]:
+                _space_rec(child, max(0, _height-1))
+                _append_last_spacer(child, _height)
+                new_children.append(child)
+                spacer = create_spacer(_height * base_gap, child.gfx_element)
+                new_children.append(GTree(spacer, parent=node))
+            _space_rec(node.children[-1], max(0, _height-1))
+            new_children.append(node.children[-1])
+            logger.debug('new children of %s: %s', str(node), str(new_children))
+            node.children = new_children
+            
+        _space_rec(self, nb_levels_to_space)
 
-    #     # print 'bsf:', list(_bfs(self, 0))
+    def adjust_size(self, get_size, set_size):
 
-    #     cur_level=0
-    #     group=[]
-    #     for node,level in _bfs(self, 0):
-    #         if level != cur_level: #jumped to a new level
-    #             # resolve level parsed so far
-    #             adjusted_size = max([n.get_size() for n in group])
-    #             for n in group:
-    #                 n.set_size(adjusted_size)
-    #             # reset group & go to the next level
-    #             cur_level = level
-    #             group[:] = []
+        if isinstance(self.gfx_element, Spacer):
+            logger.debug('Avoid spacer: %s', str(self.gfx_element))
+            return
+        
+        logger.debug('Adjust size of "%s"', str(self))
+        logger.debug('Children sizes: "%s"',
+                     ",".join(str(get_size(child.gfx_element)) \
+                              for child in self.children))
+        current_size = get_size(self.gfx_element)
+        logger.debug('current size: %d', current_size)
+        
+        child_based_size = sum(get_size(child.gfx_element)
+                               for child in self.children)
+        logger.debug('children-based size: %d', child_based_size)
+        
+        if self.parent is not None and self.parent.gfx_element is not None:
+            siblings = self.parent.children
+            logger.debug('siblings: %s', str(siblings))
+            nb_non_spacer = sum(1 for sib in siblings \
+                                if not isinstance(sib.gfx_element, Spacer)) * 1.
+            logger.debug('nb non-spacers: %d', nb_non_spacer)
+            spacer_size = sum(get_size(sib.gfx_element) \
+                              for isib, sib in enumerate(siblings) \
+                              if isinstance(sib.gfx_element, Spacer) and \
+                              isib != len(siblings)-1)
+            logger.debug('Gap size: %d', spacer_size)
+            parent_based_size = math.floor((get_size(self.parent.gfx_element) - \
+                                            spacer_size) /                      \
+                                           nb_non_spacer) 
+        else:
+            siblings = []
+            parent_based_size = 0
+        logger.debug('parent-based size: %d', parent_based_size)
+            
+        new_size = int(max(current_size, child_based_size, parent_based_size))
+        set_size(self.gfx_element, new_size)
+        logger.debug('new size: %d', new_size)
 
-    #         group.append(node)
-    #     # do last group:
-    #     adjusted_size = max([n.get_size() for n in group])
-    #     for n in group:
-    #         n.set_size(adjusted_size)
-           
-    #     # print 'bsf:', list(_bfs(self, 0))
+        new_sib_size = sum(get_size(sib.gfx_element) for sib in siblings[:-1])
+        if len(siblings) > 0 and not isinstance(siblings[-1].gfx_element, Spacer):
+            new_sib_size += get_size(siblings[-1].gfx_element) 
+        logger.debug('new siblings size: %d', new_sib_size)
+        
+        if self.parent is not None and self.parent.gfx_element is not None \
+           and new_sib_size > get_size(self.parent.gfx_element):
+            self.parent.adjust_size(get_size, set_size)
+        else:
+            for child in self.children:
+                child.adjust_size(get_size, set_size)
