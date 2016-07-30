@@ -3,28 +3,30 @@
 import os.path as op
 from setuptools import setup, find_packages
 
-execfile(op.join('cardo','version.py')) #get __version__
+execfile(op.join('cardo','version.py')) # get __version__
 
 here = op.abspath(op.dirname(__file__))
 
 # Get the long description from the README file
+# TODO: make other long description than from README.md to avoid bad formatting
+#       on pypi.org
 with open(op.join(here, 'README.md')) as f:
     long_description = f.read()
 
 setup(name='cardo', version=__version__,
-      description='Make table reporting folders organized as a UB-tree',
+      description='Make table reportings from image folders organized '\
+                  'as a UB-tree',
       long_description=long_description, author='Thomas Vincent', license='MIT',
       classifiers=['Development Status :: 2 - Pre-Alpha',
                    'Intended Audience :: Science/Research',
                    'License :: OSI Approved :: MIT License',
-                   'Topic ::  :: Build Tools',
                    'Environment :: Console',
                    'Natural Language :: English',
                    'Operating System :: OS Independent',
                    'Programming Language :: Python :: 2.7',
                    'Topic :: Multimedia :: Graphics :: Presentation',
                    'Topic :: Scientific/Engineering :: Visualization'],
-      keywords='cardo reporting SVG',
+      keywords='cardo reporting SVG image',
       packages=find_packages(exclude=['misc', 'test']),
       install_requires=['svgwrite', 'numpy'],
       entry_points={

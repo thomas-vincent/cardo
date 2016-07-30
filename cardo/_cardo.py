@@ -6,6 +6,7 @@ Inputs are files + option layout and outputs are SVG table documents.
 """
 import logging
 from cardo import tree
+from cardo import graphics
 
 TABLE_OPT_WIDTH_TO_HEIGHT_RATIO = 1 / (2**.5)
 logger = logging.getLogger('cardo')
@@ -63,6 +64,7 @@ def make_table_from_folder(data_path, data_file_pattern, max_depth=-1,
     #TODO: TEST level_names, row_levels, column_levels args
     #TODO: check consistency between given branch names and
     #      retrieved ones
+    #TODO: TEST gaps
     """
     level_names = level_names or []
 
@@ -70,6 +72,7 @@ def make_table_from_folder(data_path, data_file_pattern, max_depth=-1,
     dtree, dfiles_bnames = tree.dtree_from_folder(data_path, data_file_pattern,
                                                   max_depth)
 
+    # handle level names
     dtree_depth = tree.dtree_get_depth(dtree)
     if len(level_names) == 0:
         branch_prefix = 'tmpbn'
@@ -94,9 +97,13 @@ def make_table_from_folder(data_path, data_file_pattern, max_depth=-1,
         assert set(row_levels).issubset(level_names)
         column_levels = list(set(level_names).difference(row_levels))
                 
-    # Forge final table with target rows and columns into a SVG document 
-    return tree.dtree_to_svg(dtree, data_path, level_names, row_levels,
-                             column_levels)
+    # Forge table with target rows and columns into a SVG document
+    table = graphics.Table.from_dtree(dtree,  data_path, level_names, row_levels,
+                                      column_levels)
+    table.add_spacers()
+    table.adjust_cell_sizes()
+    table.deoverlap()
+    return table.to_svg()
 
 def opt_row_col_levels(dtree, level_names=None):
     """
@@ -134,7 +141,7 @@ def bipartition_it(elements):
           set of elements to split in two
    
     Outputs: iterator over a tuple of 2 lists.
-        Each list is a subset of elements
+        Each list is a subset of given elements
     """
     def _bpart_rec(elems, set1, set2):
         if len(set1) + len(set2) < len(elements):

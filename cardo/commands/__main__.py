@@ -16,7 +16,7 @@ def main():
     description = 'Parse given hierarchy PATH, find images captured '\
                   'within each subfolder by FILE_REGEXP and organize them '\
                   'as a table in a SVG document. Consider using quotes to '\
-                  'protect FILE_REGEXP' 
+                  'protect FILE_REGEXP.' 
     
     parser = OptionParser(usage=usage, description=description)
     
@@ -36,36 +36,34 @@ def main():
     def strsplit(option, opt_str, value, parser):
         setattr(parser.values, option.dest, value.split(','))
 
-    parser.add_option('-l', '--sublevel-names', metavar='LIST_OF_STR',
+    parser.add_option('-l', '--sublevel-names', metavar='LIST_OF_NAMES',
                       type='string', action='callback', callback=strsplit, 
                       help='define names of all subfolder levels to parse. '
                            'By default, the name of one level is its depth')
 
     
-    parser.add_option('-c', '--columns', metavar='LIST_OF_STR', type='string',
+    parser.add_option('-c', '--columns', metavar='LIST_OF_NAMES', type='string',
                       action='callback', callback=strsplit,
                       help='Names of subfolder level to put as columns in the '\
                            'final table')
 
-    parser.add_option('-r', '--rows', metavar='LIST_OF_STR', type='string',
+    parser.add_option('-r', '--rows', metavar='LIST_OF_NAMES', type='string',
                       action='callback', callback=strsplit,
                       help='Names of subfolder level to put as rows in the '\
                            'final table')
 
-    #TODO implement gaps
-    parser.add_option('-g', '--column-gap-increment', metavar='NUMBER',
-                      type='float', default=.05,
-                      help='Set the column spacing between levels.' \
+    #TODO TEST gaps
+    parser.add_option('-g', '--column-gap-increment', metavar='SIZE_PX',
+                      type='int', default=cardo.graphics.Table.DEFAULT_COL_BGAP,
+                      help='Set the column spacing between levels in px.' \
                            'Gap is increased by this increment from the '\
-                           'bottom to the top level, starting from 0.'\
-                           'It is defined a fraction of the 1st image width.')
+                           'bottom to the top level, starting from 0.')
 
-    parser.add_option('-a', '--row-gap-increment', metavar='NUMBER',
-                      type='float', default=.025,
-                      help='Set the row spacing between levels.' \
+    parser.add_option('-a', '--row-gap-increment', metavar='SIZE_PX',
+                      type='int', default=cardo.graphics.Table.DEFAULT_ROW_BGAP,
+                      help='Set the row spacing between levels in px.' \
                            'Gap is increased by this increment from the '\
-                           'bottom to the top level, starting from 0.'\
-                           'It is defined a fraction of the 1st image height.')
+                           'bottom to the top level, starting from 0.')
     
     parser.add_option('-o', '--output-file', metavar='FILE', type='string',
                       help='Output SVG file where to save table. Default: '\

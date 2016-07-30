@@ -1,20 +1,134 @@
+"""
+Provide operations on simple trees defined as nested python dicts:
+- get / setter of leaves
+- iteration over branches, leaves and items (both branches and leaves)
+- level rearranging 
+
+Provide operations on UB-trees (called DataTree here):
+- build from hierarchical folders of images
+- check structure
+"""
 import os
 import os.path as op
 import re
 from pprint import pformat
-from itertools import izip, cycle
+from itertools import izip
 import logging
-
-import numpy as np
-import svgwrite
-
-from cardo import graphics
 
 logger = logging.getLogger('cardo')
 
+## Basic tree functions ##
 
-DEFAULT_ROW_BGAP = 0.05 # 5% of image width
-DEFAULT_COL_BGAP = 0.025 # 2.5% of image height
+def get_tree_leaf(element, branch):
+    """
+    Return the nested leaf element corresponding to all dictionnary keys in
+    branch from element
+    """
+    if isinstance(element, dict) and len(branch) > 0:
+        return get_tree_leaf(element[branch[0]], branch[1:])
+    else:
+        return element
+
+
+def is_tree_leaf(tree, branch, leaf):
+    if isinstance(tree, dict) and len(branch) > 0 and tree.has_key(branch[0]):
+        return is_tree_leaf(tree[branch[0]], branch[1:], leaf)
+    elif len(branch) == 0:
+        return tree == leaf
+    else:
+        return False
+    
+    
+def set_tree_leaf(tree, branch, leaf, branch_classes=None):
+    """
+    Set the nested *leaf* element corresponding to all dictionnary keys
+    defined in *branch*, within *tree*
+    """
+    assert isinstance(tree, dict)
+    if len(branch) == 1:
+        tree[branch[0]] = leaf
+        return
+    if not tree.has_key(branch[0]):
+        if branch_classes is None:
+            tree[branch[0]] = tree.__class__()
+        else:
+            tree[branch[0]] = branch_classes[0]()
+    else:
+        assert isinstance(tree[branch[0]], dict)
+    if branch_classes is not None:
+        set_tree_leaf(tree[branch[0]], branch[1:], leaf, branch_classes[1:])
+    else:
+        set_tree_leaf(tree[branch[0]], branch[1:], leaf)
+
+
+def swap_layers(t, labels, l1, l2):
+    """ Create a new tree from t where layers labeled by l1 and l2 are swapped.
+    labels contains the branch labels of t.
+    """
+    i1 = labels.index(l1)
+    i2 = labels.index(l2)
+    nt = t.__class__()  # new tree init from the input tree
+    # can be dict, OrderedDict, SortedDict or ...
+    for b, l in izip(tree_branches_iterator(t), tree_leaves_iterator(t)):
+        nb = list(b)
+        nb[i1], nb[i2] = nb[i2], nb[i1]
+        set_tree_leaf(nt, nb, l)
+
+    return nt
+
+
+def tree_rearrange(t, branches, new_branches):
+    """ Create a new tree from t where layers are rearranged following 
+    new_branches.
+    Arg branches contains the current branch labels of t.
+    """
+    order = [branches.index(nl) for nl in new_branches]
+    nt = t.__class__()  # new tree
+    for b, l in izip(tree_branches_iterator(t), tree_leaves_iterator(t)):
+        nb = [b[i] for i in order]
+        set_tree_leaf(nt, nb, l)
+
+    return nt
+
+def tree_leaves_iterator(tree):
+    for branch in tree_branches_iterator(tree):
+        yield get_tree_leaf(tree, branch)
+
+
+def tree_branches_iterator(tree, branch=None):
+    if branch is None:
+        branch = []
+    if isinstance(tree, dict):
+        for k in tree.iterkeys():
+            for b in tree_branches_iterator(tree[k], branch + [k]):
+                yield b
+    else:
+        yield branch
+
+
+def tree_items_iterator(tree):
+    """
+    """
+    for branch in tree_branches_iterator(tree):
+        yield (branch, get_tree_leaf(tree, branch))
+
+
+def apply_to_leaves(tree, func, func_args=None, func_kwargs=None):
+    """
+    Apply function 'func' to all leaves in given 'tree' and return a new tree.
+    """
+    if func_kwargs is None:
+        func_kwargs = {}
+    if func_args is None:
+        func_args = []
+
+    newTree = tree.__class__()  # could be dict or {}
+    for branch, leaf in tree_items_iterator(tree):
+        set_tree_leaf(newTree, branch, func(leaf, *func_args, **func_kwargs))
+    return newTree
+
+        
+## Data tree (= UB-tree) functions ##        
 
 class InconsistentFileGroup(Exception):
     pass
@@ -22,10 +136,7 @@ class InconsistentFileGroup(Exception):
 class NonMatchingFilePattern(Exception):
     pass
 
-
-
 def file_list_to_tree(files, file_pat):
-
 
     if file_pat.groups > 0: # there are groups in the regexp.
                             # File list may actually be represented as
@@ -140,21 +251,6 @@ def dtree_from_folder(startpath, file_pattern, max_depth=-1):
             
     return dtree_check(tree), bfiles
 
-
-def apply_to_leaves(tree, func, func_args=None, func_kwargs=None):
-    """
-    Apply function 'func' to all leaves in given 'tree' and return a new tree.
-    """
-    if func_kwargs is None:
-        func_kwargs = {}
-    if func_args is None:
-        func_args = []
-
-    newTree = tree.__class__()  # could be dict or {}
-    for branch, leaf in tree_items_iterator(tree):
-        set_tree_leaf(newTree, branch, func(leaf, *func_args, **func_kwargs))
-    return newTree
-
 class WrongDataTreeLevel(Exception):
 
     def __init__(self, message, wrong_level_idx, ref_lvl, wrong_lvl):
@@ -220,286 +316,7 @@ def dtree_check(data_tree):
     _check_levels(data_tree, ref_levels, 0)    
     return data_tree
 
-# def dtree_add_spacers(dtree, n_lvls_rows, n_lvls_cols, row_bgap, col_bgap):
-#     def _add_spacers_rec(dt, ilvl):
-
-#         if isinstance(dt, dict):
-#             for subt in dt.itervalues():
-#                 _add_spacers_rec(subt, ilvl+1)
-
-#             if ilvl < n_lvls_rows:
-#                 sgap = ' ' * row_bgap * (n_lvls_rows - 1 - ilvl)
-#             else:
-#                 sgap = ' ' * col_bgap * (n_lvls_rows + n_lvls_cols - 1 - ilvl)
-#             if len(sgap) > 0:
-#                 dt[sgap] = None
-                
-#     _add_spacers_rec(dtree, 0)
-
-def make_headers(row_levels, col_levels):
-    # Build boxed elements for headers:
-    def mk_hdr_btexts(levels):        
-        hdr_btexts = []
-        cum_prod = 1
-        for lvl in levels:
-            cum_prod *= len(lvl)
-            clvl = cycle(sorted(lvl))
-            btexts = []
-            for i in xrange(cum_prod):
-                logger.debug('i=%d', i)
-                txt = clvl.next()
-                btexts.append(graphics.BoxedText(txt))
-            hdr_btexts.append(btexts)
-        return hdr_btexts
-    logger.debug('Make text elements for row header ...')
-    row_hdr_btexts = mk_hdr_btexts(row_levels)
-    logger.debug('Make text elements for column header ...')
-    col_hdr_btexts = mk_hdr_btexts(col_levels)
-
-    return row_hdr_btexts, col_hdr_btexts
-
-def space_headers(row_hdr_btexts, row_levels, row_base_gap,
-                  col_hdr_btexts, col_levels, col_base_gap):
-    txt_h = graphics.BoxedText.DEFAULT_FONT_H
-    def _space_header(hdr, lvls, gap, ):
-        rlvls = list(reversed(lvls))
-        relems = reversed(hdr)
-        spaced_elems = []
-        for ilvl, (lvl, hrd_elems) in enumerate(zip(rlvls, relems)):
-            spaced_line = []
-            for ie, elem in enumerate(hrd_elems):
-                # Add some before the current element
-                if ie>0: # only interleaved gaps
-                    if ie%len(lvl) != 0: #gap only concern current line
-                        spaced_line.append(graphics.Spacer(width=(ilvl) * gap,
-                                                           height=txt_h))
-                    else: #gap depends on parent level(s)
-                        ref_level = lvl
-                        tmp_ie = ie
-                        nspacers = ilvl
-                        for lvl_parent in rlvls[ilvl+1:]:
-                            if tmp_ie%len(ref_level) == 0:
-                                nspacers += 1
-                            else:
-                                break
-                            tmp_ie /= len(ref_level)
-                            ref_level = lvl_parent
-                        spaced_line.append(graphics.Spacer(nspacers * gap,
-                                                           height=txt_h))
-                # append current element
-                spaced_line.append(elem)
-            spaced_elems.insert(0, spaced_line) #take into account reversed order
-        return spaced_elems
-
-    return (_space_header(hdr, lvls, gap) \
-            for hdr, lvls, gap in ((row_hdr_btexts, row_levels, row_base_gap),
-                                   (col_hdr_btexts, col_levels, col_base_gap)))
-
-
 def dtree_to_svg(dtree, root_path, branch_names, row_branches, column_branches,
-                 row_base_gap=DEFAULT_ROW_BGAP, col_base_gap=DEFAULT_COL_BGAP):
-    """
-    Helper function to directly convert a dtree to a SVG string representation
-
-    See 'dtree_to_table_elements' for doc on arguments
-    """
-    return table_elements_to_svg(*dtree_to_table_elements(dtree, root_path,
-                                                          branch_names,
-                                                          row_branches,
-                                                          column_branches,
-                                                          row_base_gap,
-                                                          col_base_gap))
-
-
-def table_elements_to_svg(column_header, row_header, grid_imgs):
-    """
-    Return a SVG representation of the given table elements
-
-    Output (str): SVG representation
-    TODO: doc, test, implement
-    """
-    dwg = svgwrite.Drawing()
-    table_group = svgwrite.container.Group(id='table')
-    
-    col_hdr_group = svgwrite.container.Group(id='table_col_hdr')
-    for col_hdr_line in column_header:
-        for element in col_hdr_line:
-            col_hdr_group.add(element.to_svg())            
-    table_group.add(col_hdr_group)
-
-    row_hdr_group = svgwrite.container.Group(id='table_row_hdr')
-    for row_hdr_line in row_header:
-        for element in row_hdr_line:
-            row_hdr_group.add(element.to_svg())
-
-    # translate row hdr so that its bottom left corner is
-    # on the bottom left corner of the image grid
-    img_bot_y = row_header[-1][0].get_box_bot_y()
-    dy = grid_imgs[-1,0].get_box_bot_y() - img_bot_y
-    row_hdr_group.translate(tx=0,ty=dy)
-
-    # rotate row hdr by 90 deg. around the bottom left corner of the image grid
-    rot_ctr = (0, img_bot_y)
-    row_hdr_group.rotate(-90, center=rot_ctr)    
-    table_group.add(row_hdr_group)
-    
-    img_group = svgwrite.container.Group(id='table_content')
-    for row_imgs in grid_imgs:
-        for img in row_imgs:
-            img_group.add(img.to_svg())
-    table_group.add(img_group)
-
-    dwg.add(table_group)
-    return dwg.tostring()
-
-
-def dtree_to_table_elements(dtree, root_path, branch_names, row_branches,
-                            column_branches, row_base_gap=DEFAULT_ROW_BGAP,
-                            col_base_gap=DEFAULT_COL_BGAP):
-    """
-    Convert a data tree to a table of images with column and row headers
-
-    TODO: doc, test, implement
-    """
-        # Reshape tree to match target row and column axes 
-    dtree = tree_rearrange(dtree, branch_names, row_branches + column_branches)
-    levels = dtree_get_levels(dtree)
-
-    row_levels = levels[:len(row_branches)]
-    col_levels = levels[len(row_branches):]
-    row_hdr_btexts, col_hdr_btexts = make_headers(row_levels, col_levels)
-    row_hdr_btexts, col_hdr_btexts = space_headers(row_hdr_btexts, row_levels,
-                                                   row_base_gap,
-                                                   col_hdr_btexts, col_levels,
-                                                   col_base_gap)
-    # Set image size relative to text size:
-    img_h = graphics.BoxedText.DEFAULT_FONT_H * 7    
-    img_it = tree_leaves_iterator(dtree)
-    all_bimgs = np.empty((len(row_hdr_btexts[-1]), len(col_hdr_btexts[-1])),
-                         dtype=object)
-    for irow, elem in enumerate(row_hdr_btexts[-1]):
-        if isinstance(elem, graphics.Spacer): # spacer
-            # Add a full row of spacers
-            sp_h = elem.get_box_width()
-            for icol in xrange(len(col_hdr_btexts[-1])):
-                all_bimgs[irow, icol] = graphics.Spacer(height=sp_h)
-        else:
-            # interleave spacers between columns
-            for icol, elem in enumerate(col_hdr_btexts[-1]):
-                if isinstance(elem, graphics.Spacer): # spacer
-                    ew = elem.get_box_width()
-                    all_bimgs[irow, icol] = graphics.Spacer(width=ew)
-                else:
-                    bimg = graphics.BoxedImage(op.join(root_path, img_it.next()),
-                                               img_h=img_h)
-                    all_bimgs[irow, icol] = bimg
-            
-    bimgs_array = np.array(all_bimgs)
-    bimgs_array = bimgs_array.reshape(len(row_hdr_btexts[-1]),
-                                      len(col_hdr_btexts[-1]))
-    
-    # Adjust sizes of elements to avoid truncation 
-    graphics.adjust_table_sizes(row_hdr_btexts, col_hdr_btexts, bimgs_array)
-    # Position all elements 
-    graphics.arrange_table(row_hdr_btexts, col_hdr_btexts, bimgs_array)
-
-    return col_hdr_btexts, row_hdr_btexts, bimgs_array
-
-
-
-def get_tree_leaf(element, branch):
-    """
-    Return the nested leaf element corresponding to all dictionnary keys in
-    branch from element
-    """
-    if isinstance(element, dict) and len(branch) > 0:
-        return get_tree_leaf(element[branch[0]], branch[1:])
-    else:
-        return element
-
-
-def is_tree_leaf(tree, branch, leaf):
-    if isinstance(tree, dict) and len(branch) > 0 and tree.has_key(branch[0]):
-        return is_tree_leaf(tree[branch[0]], branch[1:], leaf)
-    elif len(branch) == 0:
-        return tree == leaf
-    else:
-        return False
-    
-    
-def set_tree_leaf(tree, branch, leaf, branch_classes=None):
-    """
-    Set the nested *leaf* element corresponding to all dictionnary keys
-    defined in *branch*, within *tree*
-    """
-    assert isinstance(tree, dict)
-    if len(branch) == 1:
-        tree[branch[0]] = leaf
-        return
-    if not tree.has_key(branch[0]):
-        if branch_classes is None:
-            tree[branch[0]] = tree.__class__()
-        else:
-            tree[branch[0]] = branch_classes[0]()
-    else:
-        assert isinstance(tree[branch[0]], dict)
-    if branch_classes is not None:
-        set_tree_leaf(tree[branch[0]], branch[1:], leaf, branch_classes[1:])
-    else:
-        set_tree_leaf(tree[branch[0]], branch[1:], leaf)
-
-
-def swap_layers(t, labels, l1, l2):
-    """ Create a new tree from t where layers labeled by l1 and l2 are swapped.
-    labels contains the branch labels of t.
-    """
-    i1 = labels.index(l1)
-    i2 = labels.index(l2)
-    nt = t.__class__()  # new tree init from the input tree
-    # can be dict, OrderedDict, SortedDict or ...
-    for b, l in izip(tree_branches_iterator(t), tree_leaves_iterator(t)):
-        nb = list(b)
-        nb[i1], nb[i2] = nb[i2], nb[i1]
-        set_tree_leaf(nt, nb, l)
-
-    return nt
-
-
-def tree_rearrange(t, branches, new_branches):
-    """ Create a new tree from t where layers are rearranged following 
-    new_branches.
-    Arg branches contains the current branch labels of t.
-    """
-    order = [branches.index(nl) for nl in new_branches]
-    nt = t.__class__()  # new tree
-    for b, l in izip(tree_branches_iterator(t), tree_leaves_iterator(t)):
-        nb = [b[i] for i in order]
-        set_tree_leaf(nt, nb, l)
-
-    return nt
-
-def tree_leaves_iterator(tree):
-    for branch in tree_branches_iterator(tree):
-        yield get_tree_leaf(tree, branch)
-
-
-def tree_branches_iterator(tree, branch=None):
-    if branch is None:
-        branch = []
-    if isinstance(tree, dict):
-        for k in tree.iterkeys():
-            for b in tree_branches_iterator(tree[k], branch + [k]):
-                yield b
-    else:
-        yield branch
-
-
-def tree_items_iterator(tree):
-    """
-    """
-    for branch in tree_branches_iterator(tree):
-        yield (branch, get_tree_leaf(tree, branch))
-
-
-
-                    
+                 row_base_gap=None, col_base_gap=None):
+    raise DeprecationWarning('cardo.tree.dtree_to_svg has been moved to '\
+                             'graphics.dtree_to_svg')
