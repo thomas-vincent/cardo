@@ -20,7 +20,6 @@ import os.path as op
 import imghdr
 import struct
 import math
-from pprint import pformat
 import logging
 from itertools import chain
 
@@ -301,162 +300,6 @@ def get_image_size(fname):
 
         return width, height
 
-
-def adjust_table_sizes(row_hdr_btexts, col_hdr_btexts, bimgs):
-   
-    # adjust sizes from headers:
-    adjust_hdr(row_hdr_btexts + [list(bimgs[:, 0])],
-               use_height_for_last_line=True)
-    adjust_hdr(col_hdr_btexts + [list(bimgs[0, :])])
-
-    # Adjust spacers
-    for icol,e in enumerate(bimgs[0, :]):
-        if isinstance(e, Spacer):
-            e.set_box_height(bimgs[0, icol-1].get_box_height())
-    for irow,e in enumerate(bimgs[:, 0]):
-        if isinstance(e, Spacer):
-            e.set_box_width(bimgs[irow-1, 0].get_box_width())
-    # Set adjusted sizes for all images:
-    for irow, row_bimgs in enumerate(bimgs):
-        for icol, bimg in enumerate(row_bimgs):
-            if icol > 0: # 1st column has been adjusted
-                # set height
-                bimg.set_box_height(bimgs[irow, 0].get_box_height())
-            if irow > 0: # 1st row has been adjusted
-                # set width
-                bimg.set_box_width(bimgs[0, icol].get_box_width())
-    return row_hdr_btexts, col_hdr_btexts, bimgs
-   
-
-   
-
-
-def arrange_table(row_hdr_btexts, col_hdr_btexts, bimgs_array):
-    for hdr_btexts in (col_hdr_btexts, row_hdr_btexts):
-        # Place header elements next to each other, row by row
-        for hdr_line in hdr_btexts:
-            BoxedElement.hdeoverlap(hdr_line)
-        # Place header elements on top of each others:
-        ref_elements = [hdr_line[0] for hdr_line in hdr_btexts]
-        for ilevel, hdr_line in enumerate(hdr_btexts):
-            if ilevel > 0:
-                for btext in hdr_line:
-                    BoxedElement.vdeoverlap([ref_elements[ilevel-1],
-                                             btext])       
-    # Arrange images, by row then by column
-    for row_bimgs in bimgs_array:
-        BoxedElement.hdeoverlap(row_bimgs)
-    for col_bimgs in bimgs_array.T:
-        BoxedElement.vdeoverlap([col_hdr_btexts[-1][0]] + list(col_bimgs))
-
-def adjust_hdr(hdr, use_height_for_last_line=False):
-    #TODO: clean useless functions
-    def _adjust_cell(l, i):
-        logger.debug('_adjust_cell(%d, %d)', l, i)
-        if isinstance(hdr[l][i], Spacer):
-            logger.debug('-> Spacer => returning')
-            return
-        if l == 0:
-            level_len = len(hdr[l])
-        else:
-            level_len = (len(hdr[l]) - (len(hdr[l-1])-1)/2) /   \
-                             ((len(hdr[l-1])+1)/2)
-        logger.debug('Cell is part of: %s, with unit level len of %d',
-                     str(hdr[l]), level_len)
-
-        # compute size based on children       
-        children_size = 0
-        if l == len(hdr) - 2:  # children are images
-            logger.debug('current level %d is parent of images', l)
-            # there is a one to one index match from last hdr line
-            children_idx = [i]
-            if use_height_for_last_line: #special case for row header
-                children_size = hdr[l+1][i].get_box_height()
-            else:
-                children_size = hdr[l+1][i].get_box_width()
-        elif l < len(hdr) - 2: # there are children
-            logger.debug('current level %d is normal', l)
-            clvl_len = (len(hdr[l+1]) - (len(hdr[l])-1)/2) /   \
-                               ((len(hdr[l])+1)/2)
-            logger.debug('Child level len: %d', clvl_len)
-            children_idx = range(i/2*(clvl_len+1), i/2*(clvl_len+1) + clvl_len)
-            children_size = sum(hdr[l+1][ic].get_box_width() \
-                                 for ic in children_idx)
-        else: # l == len(hdr) - 1 # cur level is images (no child)
-            logger.debug('current level %d is images (no child)', l)
-            children_idx = []
-            children_size = 0
-           
-        logger.debug('Children: %s', str(children_idx))           
-        logger.debug('children-based size: %d', children_size)
-        # Current size
-        if l == len(hdr) - 1 and use_height_for_last_line: # line is images
-            current_size = hdr[l][i].get_box_height()
-        else:
-            current_size = hdr[l][i].get_box_width()
-        logger.debug('current cell size: %d', current_size)
-       
-        # compute size based on parent:
-        parent_size = -1
-        if l > 0:
-            if l == len(hdr) - 1: # line is images
-                # one to one index matching
-                parent_idx = i
-                parent_size = hdr[l-1][parent_idx].get_box_width()
-            else:
-
-                logger.debug('Compute total gap size from %d to %d',
-                             i-i%(level_len+1), i-i%(level_len+1) + level_len)
-                gap_size = sum(hdr[l][k].get_box_width() \
-                               for k in xrange(i - i%(level_len+1),
-                                               i - i%(level_len+1) + level_len)\
-                               if isinstance(hdr[l][k], Spacer))
-                logger.debug('Gap size: %d', gap_size)
-                parent_idx = ((i - i%(level_len+1)) * 2) / (level_len + 1)
-                assert parent_idx < len(hdr[l-1])
-                logger.debug('Normal line, get parent size from cell(%d,%d)',
-                             l-1, parent_idx)
-                parent_size = math.ceil((hdr[l-1][parent_idx].get_box_width() - \
-                                         gap_size) / ((level_len+1.)/2))
-        else:
-            logger.debug('No parent (1st level)')
-           
-        logger.debug('Parent-based size: %d', parent_size)
-           
-        new_size = max(children_size, current_size, parent_size)
-        logger.debug('# new size of cell(%d,%d) = max(ch=%d, cur=%d, p=%d) = %d',
-                     l, i, children_size, current_size, parent_size, new_size)
-        level_start = i-i%(level_len+1)
-        level_end = i-i%(level_len+1) + level_len
-        logger.debug('Compute new level size from (%d,%d) to (%d,%d)',
-                     l, level_start, l, level_end)
-        if l == len(hdr) - 1 and use_height_for_last_line:
-            # line is images and hdr is for rows (adjust height of imgs)
-            hdr[l][i].set_box_height(new_size)
-            level_size = sum(hdr[l][k].get_box_height() \
-                             for k in xrange(level_start, level_end))
-        else:
-            hdr[l][i].set_box_width(new_size)
-            level_size = sum(hdr[l][k].get_box_width() \
-                             for k in xrange(level_start, level_end))
-
-        logger.debug('New level size: %d', level_size)
-        if parent_size != -1 and \
-           level_size > hdr[l-1][parent_idx].get_box_width():
-            logger.debug('# new size %d invalidates parent -> '\
-                         'Go from (%d,%d) to parent (%d,%d) [%d]',
-                         new_size, l, i, l-1, parent_idx,
-                         hdr[l-1][parent_idx].get_box_width())
-            _adjust_cell(l-1, parent_idx)
-        else:
-            for ichild in children_idx:
-                logger.debug('# Go from (%d,%d) to child (%d,%d)',
-                             l, i, l+1, ichild)
-                _adjust_cell(l+1, ichild)
-
-    logger.debug('Adjust hdr: %s', pformat(hdr))
-    for i in xrange(len(hdr[0])): # Start from 1st line
-        _adjust_cell(0, i)
                
 
 class GTree(object):
@@ -583,7 +426,8 @@ class GTree(object):
             return root_spacer_node
         
         def _space_rec(node, gap_factor):
-            logger.debug('_space_rec: height=%d, node: %s', gap_factor, str(node))
+            logger.debug('_space_rec: height=%d, node: %s',
+                         gap_factor, str(node))
             if node.is_leaf():
                 return
             new_children = []
@@ -622,15 +466,16 @@ class GTree(object):
                 siblings = self.parent.children
                 logger.debug('siblings: %s', str(siblings))
                 nb_non_spacer = sum(1 for s in siblings \
-                                    if not isinstance(s.gfx_element, Spacer)) * 1.
+                                    if not isinstance(s.gfx_element, Spacer)) \
+                                * 1.
                 logger.debug('nb non-spacers: %d', nb_non_spacer)
                 spacer_size = sum(get_size(sib.gfx_element) \
                                   for isib, sib in enumerate(siblings) \
                                   if isinstance(sib.gfx_element, Spacer))
                 logger.debug('Gap size: %d', spacer_size)
-                par_based_size = math.floor((get_size(self.parent.gfx_element) - \
-                                                spacer_size) /                   \
-                                               nb_non_spacer)
+                par_based_size = math.floor((get_size(self.parent.gfx_element) -\
+                                             spacer_size) /                     \
+                                            nb_non_spacer)
             else:
                 siblings = []
                 par_based_size = 0

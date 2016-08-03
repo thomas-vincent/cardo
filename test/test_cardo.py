@@ -91,12 +91,7 @@ class MainTest(CardoTest):
         svg = cardo.make_table_from_folder(op.join(self.tmp_dir, 'my_study'),
                                            'growth_profile.png')
         
-        if 0:
-            # Save SVG document and manually check with inkscape
-            with open(out_file, 'w') as f:
-                f.write(svg)
-
-        #TODO: check some svg content
+        
         
     def test_make_table_from_folder_cplx_leaves(self):
         
@@ -242,62 +237,6 @@ class TreeTest(CardoTest):
                         }
                           
         self.assert_trees_are_equal(data_tree, expected_tree)
-
-
-    # def test_make_headers(self):
-    #     row_hdr, col_hdr = cardo.tree.make_headers([['g1', 'g2', 'g3'],
-    #                                                 ['a', 'b', 'c'],
-    #                                                 ['h1', 'h2', 'h3']],
-    #                                                [['left', 'right']])
-    #     self.assertEquals(row_hdr[0][1].text, 'g2')
-    #     self.assertEquals(row_hdr[1][3].text, 'a')
-    #     self.assertEquals(row_hdr[2][6].text, 'h1')
-    #     self.assertEquals(col_hdr[0][0].text, 'left')
-        
-    # def test_hdr_spacing(self):
-    #     Btxt = cardo.graphics.BoxedText
-    #     rbg = 20 #px
-    #     cbg = 30 #px
-
-    #     #logger.setLevel(logging.DEBUG)
-
-    #     row_lvls = [['g1','g2','g3'], ['a','b','c'], ['h1','h2','h3']]
-    #     row_hdr = [ [Btxt(t) for t in row_lvls[0]],
-    #                  [Btxt(t) for t in row_lvls[1]*3],
-    #                  [Btxt(t) for t in row_lvls[2]*3*3] ]
-        
-    #     col_lvls = [['left', 'right']]
-    #     col_hdr = [ [Btxt(t) for t in col_lvls[0]] ]
-
-    #     sp_row_h, sp_col_h = cardo.tree.space_headers(row_hdr, row_lvls, rbg,
-    #                                                   col_hdr, col_lvls, cbg)
-
-    #     self.assertEquals(sp_row_h[0][0].text, 'g1')
-    #     self.assertIsInstance(sp_row_h[0][1], gfx.Spacer)
-    #     self.assertEquals(sp_row_h[0][1].get_box_width(), rbg*2)
-    #     self.assertEquals(sp_row_h[0][2].text, 'g2')
-    #     self.assertIsInstance(sp_row_h[0][3], gfx.Spacer)
-    #     self.assertEquals(sp_row_h[0][3].get_box_width(), rbg*2)
-
-    #     self.assertEquals(sp_row_h[1][0].text, 'a')
-    #     self.assertIsInstance(sp_row_h[1][1], gfx.Spacer)
-    #     self.assertEquals(sp_row_h[1][1].get_box_width(), rbg)
-    #     self.assertIsInstance(sp_row_h[1][5], gfx.Spacer)
-    #     self.assertEquals(sp_row_h[1][5].get_box_width(), rbg*2)
-
-    #     self.assertEquals(sp_row_h[2][0].text, 'h1')
-    #     self.assertIsInstance(sp_row_h[2][1], gfx.Spacer)
-    #     self.assertEquals(sp_row_h[2][1].get_box_width(), 0)
-    #     self.assertEquals(sp_row_h[2][2].text, 'h2')
-    #     self.assertIsInstance(sp_row_h[2][3], gfx.Spacer)
-    #     self.assertEquals(sp_row_h[2][3].get_box_width(), 0)
-    #     self.assertEquals(sp_row_h[2][4].text, 'h3')
-    #     self.assertIsInstance(sp_row_h[2][5], gfx.Spacer)
-    #     self.assertEquals(sp_row_h[2][5].get_box_width(), rbg)
-    #     self.assertIsInstance(sp_row_h[2][17], gfx.Spacer)
-    #     self.assertEquals(sp_row_h[2][17].get_box_width(), rbg*2)
-    #     self.assertIsInstance(sp_row_h[2][35], gfx.Spacer)
-    #     self.assertEquals(sp_row_h[2][35].get_box_width(), rbg*2)
 
         
 class ElementsTest(CardoTest):
