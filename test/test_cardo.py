@@ -440,7 +440,7 @@ class TableTest(CardoTest):
         images = np.array([[Bi(get_ifn(imgs_bfn[i][j])) \
                             for j in xrange(nb_elems_col)] \
                             for i in xrange(nb_elems_row)], dtype=object)
-        logger.setLevel(logging.DEBUG)
+        #logger.setLevel(logging.DEBUG)
         table = cardo.graphics.Table(row_hdr_levels, col_hdr_levels, images)
         table.deoverlap()
 
@@ -508,7 +508,7 @@ class TableTest(CardoTest):
         images = np.array([[Bi(ifn) for j in xrange(nb_elems_col)] \
                             for i in xrange(nb_elems_row)], dtype=object)
 
-        logger.setLevel(logging.DEBUG)
+        #logger.setLevel(logging.DEBUG)
         table = cardo.graphics.Table(row_hdr_levels, col_hdr_levels, images)
         table.add_spacers()
         table.adjust_cell_sizes()
