@@ -7,7 +7,6 @@ from pprint import pformat
 import re
 import numpy as np
 import base64
-import math
 import logging
 
 from .context import cardo
@@ -15,7 +14,10 @@ gfx = cardo.graphics
 
 logger = logging.getLogger('cardo')
 
-#cd ..;python -m unittest test.test_cardo
+#cd ..;python -m unittest -v test.test_cardo
+
+#TODO: check consistency of image grid
+
 
 class CardoTest(unittest.TestCase):
 
@@ -112,6 +114,8 @@ class MainTest(CardoTest):
                      'my_study/scenario1/experiment2/side_right_stim_3.png']
         
         self._create_img_files(tmp_files)
+
+        #logger.setLevel(logging.DEBUG)
         
         fpat = 'side_(?P<side>(?:left|right))_(?P<stim_name>stim_[0-9]).png'
         svg = cardo.make_table_from_folder(op.join(self.tmp_dir, 'my_study'),
@@ -296,7 +300,7 @@ class TreeTest(CardoTest):
     #     self.assertEquals(sp_row_h[2][35].get_box_width(), rbg*2)
 
         
-class GraphicsTest(CardoTest):
+class ElementsTest(CardoTest):
 
     def test_img_size(self):
         img_fn = self._create_img_files(['test.png'])[0]
@@ -346,7 +350,6 @@ class GraphicsTest(CardoTest):
 
         self.assertEquals(btxts[0].box_y, 0)
         self.assertEquals(btxts[1].box_y, 80)
-
         
     def test_to_svg(self):
         txt = 'wazzzaaaa'
@@ -357,203 +360,11 @@ class GraphicsTest(CardoTest):
         self.assertEquals(float(txt_svg.attribs['y']), float('5.0'))
         self.assertEquals(txt_svg.text, txt)
 
-    def _test_gaps(self):
-        """
-        TODO: test gaps
-        """ 
-        tmp_files = ['my_study/scenario1/experiment1/side_right_stim_1.png',
-                     'my_study/scenario1/experiment1/side_left_stim_1.png',
-                     'my_study/scenario1/experiment1/side_left_stim_3.png',
-                     'my_study/scenario1/experiment1/side_right_stim_3.png',
-                     'my_study/scenario1/experiment1/side_left_stim_2.png',
-                     'my_study/scenario1/experiment1/side_right_stim_2.png',
-                     'my_study/scenario1/experiment2/side_left_stim_1.png',
-                     'my_study/scenario1/experiment2/side_right_stim_1.png',
-                     'my_study/scenario1/experiment2/side_left_stim_2.png',
-                     'my_study/scenario1/experiment2/side_right_stim_2.png',
-                     'my_study/scenario1/experiment2/side_left_stim_3.png',
-                     'my_study/scenario1/experiment2/side_right_stim_3.png']
-        
-        self._create_img_files(tmp_files)
-        fpat = 'side_(?P<side>(?:left|right))_(?P<stim_name>stim_[0-9]).png'
-        #logger.setLevel(logging.DEBUG)
-        dtree = cardo.tree.dtree_from_folder(self.tmp_dir, fpat)
-        col_hrd, row_hdr, imgs = cardo.tree.dtree_to_table_elements(dtree,
-                                                                    self.tmp_dir)
-
-    def test_adjust_hdr(self):
-        lg_txt = 'the very very very very very very very very very long row hdr'
-        Bt = gfx.BoxedText
-        Sp = gfx.Spacer
-        gap = 20
-        row_hdr_btexts = [[Bt(lg_txt)],
-                          [Bt('r1a'), Sp(gap), Bt('r1b')],
-                          [Bt('r2a'), Sp(0), Bt('r2b'), Sp(0), Bt('r2c'),
-                           Sp(gap),
-                           Bt('r2a'), Sp(0), Bt('r2b'), Sp(0), Bt('r2c')]]
-
-        img_fn = self._create_img_files(['test.png'])[0]
-        Bi = gfx.BoxedImage
-        bimgs_1st_col = [Bi(img_fn), Sp(0), Bi(img_fn), Sp(0), Bi(img_fn),
-                         Sp(0, gap),
-                         Bi(img_fn), Sp(0), Bi(img_fn), Sp(0), Bi(img_fn)]
-
-        # logger.setLevel(logging.DEBUG)        
-        gfx.adjust_hdr(row_hdr_btexts + [bimgs_1st_col],
-                       use_height_for_last_line=True)
-
-        self.assertEquals(row_hdr_btexts[0][0].get_box_width(), 1526)
-        self.assertEquals(row_hdr_btexts[1][0].get_box_width(),
-                          math.ceil((len(lg_txt) * 25. - gap) / 2))
-        self.assertEquals(row_hdr_btexts[1][1].get_box_width(), gap)
-        
-        self.assertEquals(row_hdr_btexts[2][0].get_box_width(), 251)
-        self.assertEquals(row_hdr_btexts[2][6].get_box_width(), 251)
-        self.assertEquals(row_hdr_btexts[2][1].get_box_width(), 0)
-        self.assertEquals(row_hdr_btexts[2][5].get_box_width(), gap)
-        
-        self.assertEquals(bimgs_1st_col[0].get_box_height(), 251)
-        self.assertEquals(bimgs_1st_col[0].get_box_width(), 211)
-        self.assertEquals(bimgs_1st_col[-1].get_box_height(), 251)
-        self.assertEquals(bimgs_1st_col[-1].get_box_width(), 211)
-
-        
-    def test_adjust_table(self):
-        
-        Bt = gfx.BoxedText
-        Sp = gfx.Spacer
-        gap = 20
-        short_txt = 'short col hdr'
-        col_hdr_btexts = [[Bt(short_txt)],
-                          [Bt('c1a'), Sp(gap), Bt('c1b')],
-                          [Bt('c2a'), Sp(0), Bt('c2b'), Sp(0), Bt('c2c'),
-                           Sp(gap),
-                           Bt('c2a'), Sp(0), Bt('c2b'), Sp(0), Bt('c2c')]]
-                          
-        lg_txt = 'the very very very very very very very very very long row hdr'
-        row_hdr_btexts = [[Bt(lg_txt)],
-                          [Bt('r1a'), Sp(gap), Bt('r1b')],
-                          [Bt('r2a'), Sp(0), Bt('r2b'), Sp(0), Bt('r2c'),
-                           Sp(gap),
-                           Bt('r2a'), Sp(0), Bt('r2b'), Sp(0), Bt('r2c')]]
-
-        ifn = self._create_img_files(['test.png'])[0]
-
-        Bi = gfx.BoxedImage
-        bimgs = np.array([[Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn), Sp(gap),
-                           Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn)],
-                          [Sp(0) for i in xrange(11)],
-                          [Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn), Sp(gap),
-                           Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn)],
-                          [Sp(0) for i in xrange(11)],
-                          [Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn), Sp(gap),
-                           Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn)],
-                          [Sp(0, gap) for i in xrange(11)],
-                          [Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn), Sp(gap),
-                           Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn)],
-                          [Sp(0) for i in xrange(11)],
-                          [Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn), Sp(gap),
-                           Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn)],
-                          [Sp(0) for i in xrange(11)],
-                          [Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn), Sp(gap),
-                           Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn)]])
-
-        assert len(bimgs[:,0]) == len(row_hdr_btexts[-1])
-        assert len(bimgs[0,:]) == len(col_hdr_btexts[-1])
-                                 
-        #logger.setLevel(logging.DEBUG)
-        gfx.adjust_table_sizes(row_hdr_btexts, col_hdr_btexts, bimgs)
-
-        self.assertEquals(row_hdr_btexts[0][0].get_box_width(), 1526)
-        self.assertEquals(row_hdr_btexts[1][0].get_box_width(), 753)
-        self.assertEquals(bimgs[0][0].get_box_height(), 251)
-        self.assertEquals(bimgs[0][0].get_box_width(), 211)
-        self.assertEquals(bimgs[1][0].get_box_height(), 0)
-        self.assertEquals(bimgs[1][0].get_box_width(), 211)
-        self.assertEquals(bimgs[5][0].get_box_height(), gap)
-        self.assertEquals(bimgs[5][0].get_box_width(), 211)        
-        self.assertEquals(col_hdr_btexts[0][0].get_box_width(), 211*6 + gap)
-        self.assertEquals(col_hdr_btexts[1][0].get_box_width(), 211*3)
-        
-
-    def test_arrange(self):
-        Bt = gfx.BoxedText
-        Sp = gfx.Spacer
-        gap = 20
-        short_txt = 'short col hdr'
-        col_hdr_btexts = [[Bt(short_txt)],
-                          [Bt('c1a'), Sp(gap), Bt('c1b')],
-                          [Bt('c2a'), Sp(0), Bt('c2b'), Sp(0), Bt('c2c'),
-                           Sp(gap),
-                           Bt('c2a'), Sp(0), Bt('c2b'), Sp(0), Bt('c2c')]]
-                          
-        lg_txt = 'the very very very very very very very very very long row hdr'
-        row_hdr_btexts = [[Bt(lg_txt)],
-                          [Bt('r1a'), Sp(gap), Bt('r1b')],
-                          [Bt('r2a'), Sp(0), Bt('r2b'), Sp(0), Bt('r2c'),
-                           Sp(gap),
-                           Bt('r2a'), Sp(0), Bt('r2b'), Sp(0), Bt('r2c')]]
-
-        ifn = self._create_img_files(['test.png'])[0]
-
-        Bi = gfx.BoxedImage
-        bimgs = np.array([[Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn), Sp(gap),
-                           Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn)],
-                          [Sp(0) for i in xrange(11)],
-                          [Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn), Sp(gap),
-                           Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn)],
-                          [Sp(0) for i in xrange(11)],
-                          [Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn), Sp(gap),
-                           Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn)],
-                          [Sp(0, gap) for i in xrange(11)],
-                          [Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn), Sp(gap),
-                           Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn)],
-                          [Sp(0) for i in xrange(11)],
-                          [Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn), Sp(gap),
-                           Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn)],
-                          [Sp(0) for i in xrange(11)],
-                          [Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn), Sp(gap),
-                           Bi(ifn), Sp(0), Bi(ifn), Sp(0), Bi(ifn)]])
-
-        assert len(bimgs[:,0]) == len(row_hdr_btexts[-1])
-        assert len(bimgs[0,:]) == len(col_hdr_btexts[-1])
-
-        gfx.adjust_table_sizes(row_hdr_btexts, col_hdr_btexts, bimgs)
-
-        gfx.arrange_table(row_hdr_btexts, col_hdr_btexts, bimgs)
-
-        # Check column header
-        self.assertTupleEqual(col_hdr_btexts[0][0].get_box_coords(), (0,0))
-        self.assertTupleEqual(col_hdr_btexts[1][0].get_box_coords(), (0,40))
-        self.assertTupleEqual(col_hdr_btexts[1][1].get_box_coords(), (633,40))
-        self.assertTupleEqual(col_hdr_btexts[2][0].get_box_coords(), (0,80))
-        self.assertTupleEqual(col_hdr_btexts[2][-1].get_box_coords(),
-                              (5*211+gap,80))
-
-        # Check row header
-        self.assertTupleEqual(row_hdr_btexts[0][0].get_box_coords(), (0,0))
-        self.assertTupleEqual(row_hdr_btexts[1][0].get_box_coords(), (0,40))
-        self.assertTupleEqual(row_hdr_btexts[1][2].get_box_coords(),
-                              (753+gap, 40))
-        self.assertTupleEqual(row_hdr_btexts[2][0].get_box_coords(), (0,80))
-        self.assertTupleEqual(row_hdr_btexts[2][-1].get_box_coords(),
-                              (251*5 + gap, 80))
-
-        # Check image grid
-        self.assertTupleEqual(bimgs[0][0].get_box_coords(), (0,120))
-        self.assertTupleEqual(bimgs[1][1].get_box_size(), (0,0))
-        self.assertTupleEqual(bimgs[5][0].get_box_size(), (211,gap))
-        self.assertTupleEqual(bimgs[5][1].get_box_size(), (0,gap))
-        self.assertTupleEqual(bimgs[-1][-1].get_box_coords(),
-                              (5*211+gap,120+251*5+gap))
-
 
     def test_boxed_img(self):
         img_fn = self._create_img_files(['test.png'])[0]
         self.assertTupleEqual(gfx.BoxedImage(img_fn, img_h=100).get_box_size(),
                               (round(211./239 * 100), 100))
-                
-class BoxedRectTest(CardoTest):
 
     def test_rect_size(self):
         br = cardo.graphics.BoxedRect(50, 75, 0, 0)
@@ -572,6 +383,171 @@ class BoxedRectTest(CardoTest):
         br.set_box_height(50)
         self.assertTupleEqual(br.get_rect_coords(), (25, 0))
 
+
+class OverlappingElementException(Exception):
+    pass
+
+class TableTest(CardoTest):
+
+    def _check_no_overlap(self, elements):
+        bot_coords = np.array([elem.get_box_bot_right_coords() \
+                               for elem in elements])
+        max_x, max_y = bot_coords.max(0)
+        top_coords = np.array([elem.get_box_coords() for elem in elements])
+        min_x, min_y = top_coords.max(0)
+        self.assertGreaterEqual(min_x, 0)
+        self.assertGreaterEqual(min_y, 0)
+        
+        grid_checker = np.zeros((max_x, max_y), dtype=int) - 1
+        for ielem, element in enumerate(elements):
+            logger.debug('check_overlap for %s', str(element))
+            itop, jtop = element.get_box_coords()
+            ibot, jbot = element.get_box_bot_right_coords()
+            if itop != ibot and jtop != jbot: # do not check element with no area
+                found_elements = np.unique(grid_checker[itop:ibot, jtop:jbot])
+                logger.debug('matching elements -> %s', str(found_elements))
+                if len(found_elements) > 1 or found_elements[0] != -1:
+                    overlapping_elemts = [elements[i] for i in found_elements \
+                                          if i != -1]
+                    msg = 'Element %s overlaps with %s' \
+                          %(str(element), str(overlapping_elemts))
+                    raise OverlappingElementException(msg)
+                grid_checker[itop:ibot, jtop:jbot] = ielem
+    
+    def test_check_overlap(self):
+
+        r1 = gfx.BoxedRect(rwidth=211, rheight=40, box_x=0, box_y=80)
+        r2 = gfx.BoxedRect(rwidth=211, rheight=239, box_x=0, box_y=80)
+
+        self.assertRaises(OverlappingElementException,
+                          self._check_no_overlap, [r1,r2], )
+
+
+    def test_deoverlap_small(self):
+        col_hdr_levels = [ ['a', 'b'] ]
+        row_hdr_levels = [ ['h1', 'h2'] ]
+
+        Bi = gfx.BoxedImage
+        nb_elems_col = np.prod([len(lvl) for lvl in col_hdr_levels])
+        nb_elems_row = np.prod([len(lvl) for lvl in row_hdr_levels])
+
+        def get_ifn(ibfn):
+            return self._create_img_files([ibfn])[0]
+
+        imgs_bfn = [['h1_a.png', 'h1_b.png'],
+                    ['h2_a.png', 'h2_b.png']]
+        
+        images = np.array([[Bi(get_ifn(imgs_bfn[i][j])) \
+                            for j in xrange(nb_elems_col)] \
+                            for i in xrange(nb_elems_row)], dtype=object)
+        logger.setLevel(logging.DEBUG)
+        table = cardo.graphics.Table(row_hdr_levels, col_hdr_levels, images)
+        table.deoverlap()
+
+        relems = table.get_elements_via_row_header(walk_type='dfs')
+        self.assertEquals(relems[0][0].text, 'h1')
+        self.assertTrue(relems[0][1].img_fn.endswith('h1_a.png'))
+        self.assertEquals(relems[1][0].text, 'h2')
+        self.assertTrue(relems[1][1].img_fn.endswith('h2_a.png'))
+
+        celems = table.get_elements_via_column_header(walk_type='dfs')
+        self.assertEquals(celems[0][0].text, 'a')
+        self.assertTrue(celems[0][1].img_fn.endswith('h1_a.png'))
+        self.assertEquals(celems[1][0].text, 'b')
+        self.assertTrue(celems[1][1].img_fn.endswith('h1_b.png'))
+        
+        row_hdr, col_hdr, imgs = table.get_table_parts()
+        self._check_no_overlap(row_hdr)
+        
+        # test col hdr and imgs together as they are in the final orientation:
+        self._check_no_overlap(col_hdr + imgs)
+        
+        
+    def test_deoverlap_without_spacers(self):
+        col_hdr_levels = [ ['a', 'b', 'c'],
+                           ['1', '2'],
+                           ['o', 'oo', 'ooo'] ]
+
+        row_hdr_levels = [ ['h1', 'h2'],
+                           ['r1', 'r2']]
+        
+        ifn = self._create_img_files(['test.png'])[0]
+        Bi = gfx.BoxedImage
+        nb_elems_col = np.prod([len(lvl) for lvl in col_hdr_levels])
+        nb_elems_row = np.prod([len(lvl) for lvl in row_hdr_levels])
+        images = np.array([[Bi(ifn) for j in xrange(nb_elems_col)] \
+                            for i in xrange(nb_elems_row)], dtype=object)
+
+        table = cardo.graphics.Table(row_hdr_levels, col_hdr_levels, images)
+        table.deoverlap()
+
+        row_hdr, col_hdr, imgs = table.get_table_parts()
+        
+        # test row_hdr separately because it's not in its final orientation
+        # -> need to translate and rotate the whole group
+        # -> but it's done when producing SVG using transforms
+        # TODO: find a way to check that row hdr does not overlap with
+        #       other elements in its final position
+        self._check_no_overlap(row_hdr)
+        
+        # test col hdr and imgs together as they are in the final orientation:
+        self._check_no_overlap(col_hdr + imgs)
+
+    def test_deoverlap_with_spacers(self):
+        col_hdr_levels = [ ['a', 'b', 'c'],
+                           ['1', '2'],
+                           ['o', 'oo', 'ooo'] ]
+
+        row_hdr_levels = [ ['h1', 'h2'],
+                           ['r1', 'r2']]
+        
+        ifn = self._create_img_files(['test.png'])[0]
+        Bi = gfx.BoxedImage
+        nb_elems_col = np.prod([len(lvl) for lvl in col_hdr_levels])
+        nb_elems_row = np.prod([len(lvl) for lvl in row_hdr_levels])
+        images = np.array([[Bi(ifn) for j in xrange(nb_elems_col)] \
+                            for i in xrange(nb_elems_row)], dtype=object)
+
+        logger.setLevel(logging.DEBUG)
+        table = cardo.graphics.Table(row_hdr_levels, col_hdr_levels, images)
+        table.add_spacers()
+        table.adjust_cell_sizes()
+        table.deoverlap()
+
+        row_hdr, col_hdr, imgs = table.get_table_parts()
+        
+        # test row_hdr separately because it's not in its final orientation
+        # -> need to translate and rotate the whole group
+        # -> but it's done when producing SVG using transforms
+        # TODO: find a way to check that row hdr does not overlap with
+        #       other elements in its final position
+        self._check_no_overlap(row_hdr)
+        
+        # test col hdr and imgs together as they are in the final orientation:
+        self._check_no_overlap(col_hdr + imgs)
+
+        # check positions
+        self.assertTupleEqual(col_hdr[0].get_box_coords(), (0,0))
+        expected_next_x = 633 * 2 + gfx.Table.DEFAULT_COL_BGAP
+        self.assertTupleEqual(col_hdr[1].get_box_coords(), (expected_next_x,0))
+        expected_next_x += 2 * gfx.Table.DEFAULT_COL_BGAP
+        self.assertTupleEqual(col_hdr[2].get_box_coords(), (expected_next_x, 0))
+
+        self.assertTupleEqual(col_hdr[5].get_box_coords(),
+                              (0, gfx.BoxedText.DEFAULT_FONT_H))
+        self.assertTupleEqual(col_hdr[6].get_box_coords(),
+                              (211 * 3, gfx.BoxedText.DEFAULT_FONT_H))
+
+        self.assertTupleEqual(imgs[0].get_box_coords(),
+                              (0, gfx.BoxedText.DEFAULT_FONT_H * 3))
+        self.assertTupleEqual(imgs[1].get_box_coords(),
+                              (211, gfx.BoxedText.DEFAULT_FONT_H * 3))
+        self.assertTupleEqual(imgs[2].get_box_coords(),
+                              (211, gfx.BoxedText.DEFAULT_FONT_H * 3))
+        self.assertTupleEqual(imgs[6].get_box_coords(),
+                              (211 * 3 + gfx.Table.DEFAULT_COL_BGAP,
+                               gfx.BoxedText.DEFAULT_FONT_H * 3))
+
 class GTreeTest(CardoTest):
 
     def test_from_hdr_and_images(self):
@@ -582,17 +558,16 @@ class GTreeTest(CardoTest):
 
         ifn = self._create_img_files(['test.png'])[0]
         Bi = gfx.BoxedImage
-        images = [[Bi(ifn) for i in xrange(18)] for j in xrange(3)]
+        images = np.array([[Bi(ifn) for i in xrange(18)] for j in xrange(3)]).T
         root = cardo.graphics.GTree.from_hdr_and_images(hdr_levels, images)
 
-        self.assertEquals(root.get_height(), len(hdr_levels) + len(images))
+        self.assertEquals(root.get_height(), len(hdr_levels) + images.shape[1])
         self.assertEquals(root.children[0].gfx_element.text, 'a')
         self.assertEquals(root.children[1].gfx_element.text, 'b')
         self.assertEquals(root.children[2].gfx_element.text, 'c')
         self.assertEquals(root.children[0].children[0].gfx_element.text, '1')
         img_1 = root.children[0].children[0].children[0].children[0].gfx_element
         self.assertIsInstance(img_1, cardo.graphics.BoxedImage)
-
 
     def test_spacing(self):
         
@@ -602,7 +577,7 @@ class GTreeTest(CardoTest):
 
         ifn = self._create_img_files(['test.png'])[0]
         Bi = gfx.BoxedImage
-        images = [[Bi(ifn) for i in xrange(18)] for j in xrange(3)]
+        images = np.array([[Bi(ifn) for i in xrange(18)] for j in xrange(3)]).T
         root = cardo.graphics.GTree.from_hdr_and_images(hdr_levels, images)
 
         def create_spacer(gap, ref_sibling):
@@ -630,12 +605,13 @@ class GTreeTest(CardoTest):
     def test_resize(self):
         lg_txt = 'the very very very very very very very very very long row hdr'
         hdr_levels = [ [lg_txt],
-                       ['r1a', 'r1b2'],
+                       ['r1a', 'r1b'],
                        ['r2a', 'r2b', 'r2c'] ]
 
         ifn = self._create_img_files(['test.png'])[0]
         Bi = gfx.BoxedImage
-        images = [[Bi(ifn) for i in xrange(6)] for j in xrange(3)]
+        images = np.array([[Bi(ifn) for i in xrange(6)] \
+                           for j in xrange(3)]).T
         root = cardo.graphics.GTree.from_hdr_and_images(hdr_levels, images)
 
         #logger.setLevel(logging.DEBUG)
@@ -658,6 +634,81 @@ class GTreeTest(CardoTest):
         subnode = subnode.children[-1]
         self.assertTupleEqual(subnode.gfx_element.get_box_size(), (254, 239))
 
+    def test_resize_short_hdr(self):
+        hdr_levels = [ ['top'],
+                       ['r1a', '-'*27],
+                       ['r2a', 'r2b', 'r2c'] ]
+
+        ifn = self._create_img_files(['test.png'])[0]
+        Bi = gfx.BoxedImage
+        images = np.array([[Bi(ifn) for i in xrange(6)] for j in xrange(3)]).T
+        root = cardo.graphics.GTree.from_hdr_and_images(hdr_levels, images)
+
+        #logger.setLevel(logging.DEBUG)
+                
+        def get_elem_size_col_hdr(elem):
+            return elem.get_box_width()
+        
+        def set_elem_size_col_hdr(elem, s):
+            return elem.set_box_width(s)
+
+        for child in root.children:
+            child.adjust_size(get_elem_size_col_hdr, set_elem_size_col_hdr)
+            
+        subnode = root.children[0]
+        self.assertTupleEqual(subnode.gfx_element.get_box_size(), (1349,40))
+        subnode = subnode.children[-1]
+        self.assertTupleEqual(subnode.gfx_element.get_box_size(), (675,40))
+        subnode2 = root.children[0].children[0]
+        self.assertTupleEqual(subnode2.gfx_element.get_box_size(), (674,40))
+        subnode = subnode.children[-1]
+        self.assertTupleEqual(subnode.gfx_element.get_box_size(), (225,40))
+        subnode = subnode.children[-1]
+        self.assertTupleEqual(subnode.gfx_element.get_box_size(), (225, 239))
+
+
+    def test_resize_with_gaps(self):
+        hdr_levels = [ ['top'],
+                       ['r1a', '-'*27],
+                       ['r2a', 'r2b', 'r2c'] ]
+
+        ifn = self._create_img_files(['test.png'])[0]
+        Bi = gfx.BoxedImage
+        images = np.array([[Bi(ifn) for i in xrange(6)] for j in xrange(3)]).T
+        root = cardo.graphics.GTree.from_hdr_and_images(hdr_levels, images)
+
+        base_gap = 10
+        def create_spacer(gap, ref_sibling):
+            return cardo.graphics.Spacer(gap, ref_sibling.get_box_height())
+        root.add_spacers(base_gap, create_spacer,
+                         nb_levels_to_space=len(hdr_levels))
+        
+        #logger.setLevel(logging.DEBUG)
+                
+        def get_elem_size_col_hdr(elem):
+            return elem.get_box_width()
+        
+        def set_elem_size_col_hdr(elem, s):
+            return elem.set_box_width(s)
+
+        for child in root.children:
+            child.adjust_size(get_elem_size_col_hdr, set_elem_size_col_hdr)
+            
+        subnode = root.children[0]
+        self.assertTupleEqual(subnode.gfx_element.get_box_size(), (1369,40))
+        subchildren = subnode.children
+        self.assertTupleEqual(subchildren[0].gfx_element.get_box_size(), (674,40))
+        self.assertTupleEqual(subchildren[1].gfx_element.get_box_size(), (20,40))
+        self.assertTupleEqual(subchildren[1].children[0].gfx_element.get_box_size(),
+                              (20,40))
+        self.assertTupleEqual(subchildren[2].gfx_element.get_box_size(), (675,40))
+        subchildren = subnode.children[-1].children
+        self.assertTupleEqual(subchildren[0].gfx_element.get_box_size(), (218,40))
+        self.assertTupleEqual(subchildren[1].gfx_element.get_box_size(), (10,40))
+        subnode = subchildren[0].children[-1]
+        self.assertTupleEqual(subnode.gfx_element.get_box_size(), (218, 239))
+        
+        
     def test_get_elements(self):
         hdr_levels = [ ['the top hdr'],
                        ['r1a', 'r1b'],
@@ -667,11 +718,13 @@ class GTreeTest(CardoTest):
             return self._create_img_files(['%d_%d.png' %(irow, icol)])[0]
 
         Bi = gfx.BoxedImage
-        images = [[Bi(get_ifn(i,j)) for j in xrange(6)] for i in xrange(3)]
-
-        #print 'create gtree from hdr and images ...'
-        #logger.setLevel(logging.DEBUG)
+        images = np.array([[Bi(get_ifn(i,j)) for j in xrange(6)] \
+                           for i in xrange(3)]).T
+        
+        
         root = cardo.graphics.GTree.from_hdr_and_images(hdr_levels, images)
+
+        # bfs, leveled
         elements = root.get_elements()
 
         self.assertEquals(elements[0][0].text, 'the top hdr')
@@ -685,6 +738,72 @@ class GTreeTest(CardoTest):
         self.assertTrue(elements[4][0].img_fn.endswith('1_0.png'))
         self.assertTrue(elements[4][-1].img_fn.endswith('1_5.png'))
         self.assertTrue(elements[-1][-1].img_fn.endswith('2_5.png'))
+
+        # bfs, not leveled
+        elements = root.get_elements(leveled=False)
+        self.assertEquals(elements[0].text, 'the top hdr')
+        self.assertEquals(elements[1].text, 'r1a')
+        self.assertEquals(elements[2].text, 'r1b')
+        self.assertEquals(elements[3].text, 'r2a')
+        self.assertEquals(elements[6].text, 'r2a')
+        self.assertTrue(elements[9].img_fn.endswith('0_0.png'))
+        self.assertTrue(elements[14].img_fn.endswith('0_5.png'))
+        self.assertTrue(elements[15].img_fn.endswith('1_0.png'))
+        self.assertTrue(elements[20].img_fn.endswith('1_5.png'))
+        self.assertTrue(elements[-1].img_fn.endswith('2_5.png'))
+        
+        # dfs, leveled
+        #logger.setLevel(logging.DEBUG)
+        elements = root.get_elements(walk_type='dfs')
+        self.assertEquals(elements[0][0].text, 'the top hdr')
+        self.assertEquals(elements[0][1].text, 'r1a')
+        self.assertEquals(elements[0][2].text, 'r2a')
+        self.assertTrue(elements[0][3].img_fn.endswith('0_0.png'))
+        self.assertTrue(elements[0][4].img_fn.endswith('1_0.png'))
+        self.assertEquals(elements[1][1].text, 'r1a')
+        self.assertEquals(elements[1][2].text, 'r2b')
+        self.assertTrue(elements[1][3].img_fn.endswith('0_1.png'))
+        self.assertTrue(elements[1][4].img_fn.endswith('1_1.png'))
+        self.assertTrue(elements[1][5].img_fn.endswith('2_1.png'))
+        self.assertTrue(elements[2][4].img_fn.endswith('1_2.png'))
+        self.assertTrue(elements[5][4].img_fn.endswith('1_5.png'))
+        self.assertTrue(elements[-1][-1].img_fn.endswith('2_5.png'))
+
+    def test_get_element_partial(self):
+
+        hdr_levels = [ ['the top hdr'],
+                       ['r1a', 'r1b'],
+                       ['r2a', 'r2b', 'r2c'] ]
+
+        def get_ifn(irow, icol):
+            return self._create_img_files(['%d_%d.png' %(irow, icol)])[0]
+
+        Bi = gfx.BoxedImage
+        images = np.array([[Bi(get_ifn(i,j)) for j in xrange(6)] \
+                           for i in xrange(3)]).T
+
+        root = cardo.graphics.GTree.from_hdr_and_images(hdr_levels, images)
+
+        # dfs, skip hdr
+        elements = root.get_elements(walk_type='dfs', start_depth=3)
+        self.assertTrue(elements[0][0].img_fn.endswith('0_0.png'))
+        self.assertTrue(elements[0][1].img_fn.endswith('1_0.png'))
+        self.assertTrue(elements[1][0].img_fn.endswith('0_1.png'))
+        self.assertTrue(elements[1][1].img_fn.endswith('1_1.png'))
+        self.assertTrue(elements[1][2].img_fn.endswith('2_1.png'))
+        self.assertTrue(elements[2][1].img_fn.endswith('1_2.png'))
+        self.assertTrue(elements[5][1].img_fn.endswith('1_5.png'))
+        self.assertTrue(elements[-1][-1].img_fn.endswith('2_5.png'))
+
+        # bfs, skip hdr
+        elements = root.get_elements(walk_type='bfs', start_depth=3)
+        self.assertTrue(elements[0][0].img_fn.endswith('0_0.png'))
+        self.assertTrue(elements[0][-1].img_fn.endswith('0_5.png'))
+        self.assertTrue(elements[1][0].img_fn.endswith('1_0.png'))
+        self.assertTrue(elements[1][-1].img_fn.endswith('1_5.png'))
+        self.assertTrue(elements[-1][-1].img_fn.endswith('2_5.png'))
+
+        
         
     def test_resize_with_spacers(self):
         lg_txt = 'the very very very very very very very very very long row hdr'
@@ -694,7 +813,7 @@ class GTreeTest(CardoTest):
 
         ifn = self._create_img_files(['test.png'])[0]
         Bi = gfx.BoxedImage
-        images = [[Bi(ifn) for i in xrange(6)] for j in xrange(3)]
+        images = np.array([[Bi(ifn) for i in xrange(6)] for j in xrange(3)]).T
 
         #print 'create gtree from hdr and images ...'
         root = cardo.graphics.GTree.from_hdr_and_images(hdr_levels, images)

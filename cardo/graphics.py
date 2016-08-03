@@ -22,10 +22,12 @@ import struct
 import math
 from pprint import pformat
 import logging
-import numpy as np
-from cardo import tree
+from itertools import chain
 
+import numpy as np
 import svgwrite
+
+from cardo import tree
 
 logger = logging.getLogger('cardo')
 
@@ -46,6 +48,9 @@ class BoxedElement(object):
         self.box_width = min_width
         self.box_height = min_height
 
+    def __repr__(self):
+        return '(%d,%d)[%d,%d]' %(self.get_box_size()+ self.get_box_coords())
+        
     def set_box_x(self, x):
         self.box_x = x
 
@@ -79,9 +84,14 @@ class BoxedElement(object):
     def get_box_bot_y(self):
         return self.box_y + self.get_box_height()
 
+    def get_box_bot_right_coords(self):
+        return self.get_box_right_x(), self.get_box_bot_y()
+    
     def get_box_bot_left_coords(self):
         return self.box_x, self.box_y + self.get_box_height()
 
+
+    
     @staticmethod
     def hdeoverlap(belems, gap=0):
         """"
@@ -133,7 +143,7 @@ class BoxedText(BoxedElement):
             self.set_box_height(box_height)       
 
     def __repr__(self):
-        return self.text + str(self.get_box_size())
+        return self.text + super(BoxedText, self).__repr__()
 
     def get_text_size(self):
         """ Predict the size of the text bounding box in px"""
@@ -209,18 +219,18 @@ class BoxedRect(BoxedElement):
                        
         return (x,y)
 
-
 class Spacer(BoxedRect):
     #TODO: test
-    def __init__(self, width=0, height=0):
-        BoxedRect.__init__(self, width, height, 0, 0)
+    def __init__(self, width=0, height=0, box_x=0, box_y=0):
+        BoxedRect.__init__(self, width, height, box_x, box_y)
 
     def __repr__(self):
-        return '@' + str(self.get_box_size())
+        return '@' + super(Spacer, self).__repr__()
        
     def to_svg(self):
         return svgwrite.shapes.Rect(insert=self.get_box_coords(),
-                                    size=self.get_box_size())
+                                    size=self.get_box_size(),
+                                    style='stroke:none;fill:none')
        
 class BoxedImage(BoxedRect):
 
@@ -248,7 +258,7 @@ class BoxedImage(BoxedRect):
                            box_x, box_y, halign, valign)
 
     def __repr__(self):
-        return op.basename(self.img_fn)
+        return op.basename(self.img_fn) + super(BoxedImage, self).__repr__()
         
     def to_svg(self):
         return svgwrite.image.Image(self.img_fn, insert=self.get_rect_coords(),
@@ -340,6 +350,7 @@ def arrange_table(row_hdr_btexts, col_hdr_btexts, bimgs_array):
         BoxedElement.vdeoverlap([col_hdr_btexts[-1][0]] + list(col_bimgs))
 
 def adjust_hdr(hdr, use_height_for_last_line=False):
+    #TODO: clean useless functions
     def _adjust_cell(l, i):
         logger.debug('_adjust_cell(%d, %d)', l, i)
         if isinstance(hdr[l][i], Spacer):
@@ -464,7 +475,7 @@ class GTree(object):
         self.parent = parent
 
     def __repr__(self):
-        return self.gfx_element.__repr__()
+        return '.' + self.gfx_element.__repr__()
 
     def set_parent(self, parent):
         self.parent = parent
@@ -482,13 +493,32 @@ class GTree(object):
             return max(child.get_height()+1 for child in self.children)
 
     def to_string(self):
-        def _depth_first_walk(node, line):
+        def _breath_first_walk(node):
+            visited, queue = set(), [(self,-1)]
+            sizes = [0]
+            cur_level = -1
+            while queue:
+                node, level = queue.pop(0)
+                if level != cur_level:
+                    sizes.append(0)
+                    cur_level = level
+                if node.gfx_element is not None:
+                        sizes[-1] = max(sizes[-1], len(str(node.gfx_element)))
+                if node not in visited:
+                    visited.add(node)
+                    queue.extend((c, cur_level+1) for c in node.children \
+                                 if c not in visited)
+            return sizes
+        level_sizes = _breath_first_walk(self)
+            
+        def _depth_first_walk(node, line, ilevel):
+            node_str = str(node.gfx_element).ljust(level_sizes[ilevel])
             if node.is_leaf():
-                print line
+                print line + ' | ' + node_str
             else:
                 for child in node.children:
-                    _depth_first_walk(child, line + '-' + str(node.gfx_element))
-        _depth_first_walk(self, '')
+                    _depth_first_walk(child, line + ' | ' + node_str, ilevel+1)
+        _depth_first_walk(self, '', 0)
 
         
     @staticmethod
@@ -502,20 +532,21 @@ class GTree(object):
                    [['lvl1_item1', 'lvl1_item2, ...],
                     ['lvl2_item1', 'lvl1_item1, ...],
                     ...]
-            - images (list of list of BoxedImage):
-                 2d array of image elements. Row size must equal
+            - images (numpy array of BoxedImage):
+                 2d array of image elements. image.shape[0] must equal
                  the cartesian product of hdr_levels
         """
         def leaf_img_trees():
-            for icol in xrange(len(images[0])):
-                col_root = GTree(images[0][icol])
+            for irow in xrange(len(images)):
+                col_root = GTree(images[irow][0])
                 cur_node = col_root
-                for irow in xrange(1, len(images)):
+                for icol in xrange(1, len(images[0])):
                     next_child = GTree(images[irow][icol], parent=cur_node)
                     cur_node.add_child(next_child)
                     cur_node = next_child
                 yield col_root
-        img_col_tree_iterator = leaf_img_trees()
+        img_tree_iterator = leaf_img_trees()
+        
         
         root = GTree(None)
         def _create_levels_rec(node, levels):
@@ -528,7 +559,7 @@ class GTree(object):
                 _create_levels_rec(new_child, levels[1:])
             if len(levels) == 1:
                 for child in node.children:
-                    img_tree = img_col_tree_iterator.next()
+                    img_tree = img_tree_iterator.next()
                     img_tree.set_parent(child)
                     child.add_child(img_tree)
         _create_levels_rec(root, hdr_levels)
@@ -574,7 +605,6 @@ class GTree(object):
         if isinstance(self.gfx_element, Spacer):
             logger.debug('Avoid spacer: %s', str(self.gfx_element))
             return
-
         
         logger.debug('Adjust size of "%s"', str(self))
         logger.debug('Children sizes: "%s"',
@@ -619,15 +649,31 @@ class GTree(object):
         else:
             for child in self.children:
                 child.adjust_size(get_size, set_size)
-
+        
+                
     def get_elements(self, filt=None, walk_type='bfs', start_depth=0,
-                     max_depth=-1):
+                     leveled=True, max_depth=-1, reverse_child_order=False):
         """
-        Gather all elements in the tree that match the given predicator "filt".
+        Gather all elements that match the given predicator *filt*.
         Do a breath-first or depth-first walk of the tree.
+        
+        Output: 
+            - If *leveled* is True then:
+                 list of list of BoxedElements
+                 - first dimension is parsed layers
+                 - second dimension is elements in the current layer 
+            - If *leveled* is False then:
+                 list of BoxedElements
+
+        TODO: test max_depth, reverse
         """
         if filt is None:
             filt = lambda x: True
+
+        if reverse_child_order:
+            parse_child = lambda x: reversed(x)
+        else:
+            parse_child = lambda x: x
             
         if walk_type == 'bfs':
             visited, queue = set(), [(self,-1)]
@@ -639,31 +685,67 @@ class GTree(object):
                 if level != cur_level:
                     if max_depth !=-1 and level >= max_depth:
                         break
-                    if level >= start_depth:
+                    if leveled and level >= start_depth:
                         elements.append([])
                     cur_level = level
                 if level >= start_depth and node.gfx_element is not None and \
                    filt(node.gfx_element):
-                    elements[-1].append(node.gfx_element)
+                    if leveled:
+                        elements[-1].append(node.gfx_element)
+                    else:
+                        elements.append(node.gfx_element)
                 if node not in visited:
                     visited.add(node)
-                    queue.extend((c, cur_level+1) for c in node.children \
+                    queue.extend((c, cur_level+1)
+                                 for c in parse_child(node.children) \
                                  if c not in visited)
         else: # detph-1st-search
-            def _depth_first_walk(node, elems, depth):
-                if node.is_leaf() or (max_depth != -1 and depth==max_depth):
-                    yield elems
-                else:
-                    for child in node.children:
-                        if depth >= start_depth and \
-                           node.gfx_element is not None and \
-                           filt(node.gfx_element):
-                            _depth_first_walk(node, elems + node.gfx_element,
-                                              depth + 1)
-                        else: #skip tree root
-                            _depth_first_walk(node, elems, depth)
             elements = []
-            _depth_first_walk(self, elements, 0)
+            def _depth_first_walk(node, depth):
+                logger.debug('dfw, node: %s, depth=%d', str(node), depth)
+                if node.is_leaf() or (max_depth != -1 and depth == max_depth):
+                    if filt(node.gfx_element) and depth >= start_depth:
+                        elements.append(node.gfx_element)
+                else:
+                    if node.gfx_element is None: # skip tree root
+                        for child in parse_child(node.children):
+                            _depth_first_walk(child, depth)
+                    else:
+                        for child in parse_child(node.children):
+                            if filt(node.gfx_element) and depth >= start_depth:
+                                elements.append(node.gfx_element)
+                            _depth_first_walk(child, depth + 1)
+            
+            def _depth_first_walk_leveled(node, branch, depth):
+                logger.debug('dfw, pending branch: %s', str(branch))
+                logger.debug('dfw, current node: %s, depth=%d', str(node), depth)
+                if node.is_leaf() or (max_depth != -1 and depth >= max_depth):
+                    logger.debug('Arrived to leaf, append content and return')
+                    if filt(node.gfx_element) and depth >= start_depth and \
+                       (depth < max_depth or max_depth == -1):
+                        branch = branch + [node.gfx_element]
+                    else:
+                        logger.debug('Gfx element does not match filter or '\
+                                     'max_depth reached')
+                    elements.append(branch)
+                    logger.debug('Updated walked elements: %s', str(elements))
+                else:
+                    if node.gfx_element is None: # skip tree root
+                        for child in parse_child(node.children):
+                            _depth_first_walk_leveled(child, branch, depth)
+                    else:
+                        for child in parse_child(node.children):
+                            if depth >= start_depth and filt(node.gfx_element) :
+                                _depth_first_walk_leveled(child, branch + \
+                                                          [node.gfx_element],
+                                                          depth + 1)
+                            else:
+                                _depth_first_walk_leveled(child, branch,
+                                                          depth + 1)
+            if not leveled:
+                _depth_first_walk(self, 0)
+            else:
+                _depth_first_walk_leveled(self, [], 0)
         return elements
                 
 class Table(object):
@@ -688,31 +770,47 @@ class Table(object):
                       - col_hdr_levels[0][0], col_hdr_levels[1][0],  ...
                         col_hdr_levels[-1][0]
                       and
-                      - row_hdr_levels[0][-1], row_hdr_levels[1][-1],  ...
-                        row_hdr_levels[-1][-1]
+                      - row_hdr_levels[0][0], row_hdr_levels[1][0],  ...
+                        row_hdr_levels[-1][0]
                 -> the cartesian product of col_hdr_levels has the same size as
                    the size of the 1st row of images
                 -> the cartesian product of row_hdr_levels has the same size as
                    the size of the 1st column of images                
+        Args:
+            - row_hdr_levels (list of list of str):
+                texts for each levels in the row header
+            - col_hdr_levels (list of list of str):
+                texts for each levels in the column header
+            - imgages (numpy array of BoxedImage):
+                2d array of images
         """
         assert(np.prod([len(lvl) for lvl in col_hdr_levels]) == len(images[0]))
         assert(np.prod([len(lvl) for lvl in row_hdr_levels]) == len(images))
-        # Set image size relative to text size:
-        # img_h = BoxedText.DEFAULT_FONT_H * 7
-        # for row in len(images):
-        #     for img in row:
-        #         img.set_
 
         self.col_hdr_height = len(col_hdr_levels)
-        self.col_gtree = GTree.from_hdr_and_images(col_hdr_levels, images)
-        self.row_hdr_height = len(row_hdr_levels)
-        self.row_gtree = GTree.from_hdr_and_images(row_hdr_levels, images.T)
+        self.col_gtree = GTree.from_hdr_and_images(col_hdr_levels, images.T)
 
+        self.row_hdr_height = len(row_hdr_levels)
+        self.row_gtree = GTree.from_hdr_and_images(row_hdr_levels, images)
+
+        self.images = images
+        logger.debug('Init Table with row hdr levels: %s, col hdr levels: %s' \
+                     ', grid image of size %s -> built a row hdr tree of '\
+                     'height %d and a col hdr tree of height %d.',
+                     str(row_hdr_levels), str(col_hdr_levels), str(images.shape),
+                     self.row_gtree.get_height(), self.col_gtree.get_height())
+                             
     @staticmethod
     def from_dtree(dtree, root_path, branch_names, row_branches,
                    column_branches):
         return Table(*dtree_to_table_elements(dtree, root_path, branch_names,
                                               row_branches, column_branches))
+
+    def get_col_header_elements(self):
+        return self.col_gtree.get_elements(max_depth=self.col_hdr_height)
+
+    def get_row_header_elements(self):
+        return self.row_gtree.get_elements(max_depth=self.row_hdr_height)
     
     def add_spacers(self, row_base_gap=DEFAULT_ROW_BGAP,
                     col_base_gap=DEFAULT_COL_BGAP):
@@ -720,7 +818,7 @@ class Table(object):
         def create_col_spacer(gap, ref_sibling):
             return Spacer(width=gap, height=ref_sibling.get_box_height())
         self.col_gtree.add_spacers(col_base_gap, create_col_spacer,
-                                   self.col_hdr_height)
+                                   self.col_hdr_height-1)
         
         def create_row_spacer(gap, ref_sibling):
             if isinstance(ref_sibling, BoxedImage):
@@ -728,7 +826,7 @@ class Table(object):
             else:
                 return Spacer(width=gap, height=ref_sibling.get_box_height())    
         self.row_gtree.add_spacers(row_base_gap, create_row_spacer,
-                                   self.row_hdr_height)
+                                   self.row_hdr_height-1)
             
     def adjust_cell_sizes(self):
         """
@@ -751,29 +849,64 @@ class Table(object):
                 gelem.set_box_height(size)
             else:
                 gelem.set_box_width(size)
-        self.col_gtree.adjust_size(rowgt_get_size, rowgt_set_size)
+        self.row_gtree.adjust_size(rowgt_get_size, rowgt_set_size)
 
+    def get_elements_via_column_header(self, walk_type='bfs'):
+        return self.col_gtree.get_elements(walk_type=walk_type)
+
+    def get_elements_via_row_header(self, walk_type='bfs'):
+        return self.row_gtree.get_elements(walk_type=walk_type)
+
+    
     def deoverlap(self):
         """
         Move all elements to remove all overlaps.
         For headers, elements are moved from left to right
         For the grid of images, elements are moved from left to right and
         from top to bottom
+        TODO: test
         """
-        elements_by_column = self.col_gtree.get_elements(walk_type='dfs')
-        for column in elements_by_column:
-            BoxedElement.vdeoverlap()
+        logger.debug('Deoverlap table ...')
 
-        row_header = self.row_gtree.get_elements(Table.is_hdr_element,
-                                                 walk_type='dfs')
-        for row in row_header:
-            BoxedElement.hdeoverlap(row)
+        logger.debug('vDeoverlap elements from col view ...')
+        vlines_via_chdr = self.col_gtree.get_elements(walk_type='dfs')
+        for vline in vlines_via_chdr:
+            logger.debug('Deoverlap vline: %s ...', str(vline))
+            BoxedElement.vdeoverlap(vline)
+            logger.debug('->  %s', str(vline))
 
-        imgs_by_row = self.row_gtree.get_elements(Table.is_img_element,
-                                                  walk_type='dfs')
-        for row in imgs_by_row:
-            BoxedElement.hdeoverlap(row)
+        logger.debug('hDeoverlap elements from col view ...')            
+        hlines_via_chdr = self.col_gtree.get_elements(max_depth=self.col_hdr_height,
+                                                      walk_type='bfs')
+        for hline in hlines_via_chdr:
+            logger.debug('Deoverlap hline: %s ...', str(hline))
+            BoxedElement.hdeoverlap(hline)
+            logger.debug('->  %s', str(hline))
+
+        logger.debug('vDeoverlap elements from row view ...')
+        vlines_via_rhdr = self.row_gtree.get_elements(max_depth=self.row_hdr_height,
+                                                      walk_type='dfs')
+        for vline in vlines_via_rhdr:
+            logger.debug('Deoverlap vline: %s ...', str(vline))
+            BoxedElement.vdeoverlap(vline)
+            logger.debug('->  %s', str(vline))
         
+        logger.debug('hDeoverlap elements from row view (reversed!) ...')
+        hlines_via_rhdr = self.row_gtree.get_elements(max_depth=self.row_hdr_height,
+                                                      walk_type='bfs')
+        for hline in hlines_via_rhdr:
+            logger.debug('Deoverlap hline: %s ...', str(vline))
+            BoxedElement.hdeoverlap(list(reversed(hline)))
+            logger.debug('->  %s', str(vline))
+
+        logger.debug('hDeoverlap img elements from row view ...')            
+        row_imgs = self.row_gtree.get_elements(start_depth=self.row_hdr_height,
+                                               walk_type='dfs')
+        for row in row_imgs:
+            logger.debug('Deoverlap img row: %s ...', str(row))
+            BoxedElement.hdeoverlap(row)
+            logger.debug('->  %s', str(row))
+                   
     @staticmethod
     def is_hdr_element(element):
         return not isinstance(element, BoxedImage)
@@ -781,52 +914,71 @@ class Table(object):
     @staticmethod
     def is_img_element(element):
         return isinstance(element, BoxedImage)
-    
+
+
+    def get_table_parts(self):
+        """
+        
+        Outputs are not leveled
+        """
+        col_header = self.col_gtree.get_elements(max_depth=self.col_hdr_height)
+        row_header = self.row_gtree.get_elements(max_depth=self.row_hdr_height)
+
+        imgs_cview = self.col_gtree.get_elements(start_depth=self.col_hdr_height)
+        if not isinstance(imgs_cview[0][1], Spacer):
+            imgs = np.array(imgs_cview)
+        else:
+            rh = self.row_hdr_height
+            imgs_rview = self.row_gtree.get_elements(start_depth=rh,
+                                                     walk_type='dfs')
+            imgs = np.empty((len(row_header[-1]), len(col_header[-1])),
+                            dtype=object)
+            imgs[::2, :] = np.array(imgs_cview, dtype=object)
+            imgs[1::2, ::2] = np.array(imgs_rview, dtype=object)[1::2, :]
+            for i, j in np.vstack(np.where(np.equal(imgs, None))).T:
+                imgs[i, j] = Spacer(imgs[i-1, j].get_box_width(),
+                                    imgs[i, j-1].get_box_height(),
+                                    imgs[i, j-1].get_box_right_x(),
+                                    imgs[i-1, j].get_box_bot_y())
+
+            for row in imgs:
+                BoxedElement.hdeoverlap(row)
+                
+            for col in imgs.T:
+                BoxedElement.vdeoverlap(col)
+                
+        return list(chain(*row_header)), list(chain(*col_header)), \
+            list(imgs.flatten())
+        
     def to_svg(self):
 
+        row_header, column_header, imgs = self.get_table_parts()
+        
         dwg = svgwrite.Drawing()
         table_group = svgwrite.container.Group(id='table')
 
         col_hdr_group = svgwrite.container.Group(id='table_col_hdr')
-        column_header = self.col_gtree.get_elements(max_depth=self.col_hdr_height)
-        for col_hdr_line in column_header:
-            for element in col_hdr_line:
-                col_hdr_group.add(element.to_svg())            
+        for element in column_header:
+            col_hdr_group.add(element.to_svg())            
         table_group.add(col_hdr_group)
 
         row_hdr_group = svgwrite.container.Group(id='table_row_hdr')
-        row_header = self.row_gtree.get_elements(max_depth=self.row_hdr_height)
-        for row_hdr_line in row_header:
-            for element in row_hdr_line:
-                row_hdr_group.add(element.to_svg())
-
-        imgs_cview = self.col_gtree.get_elements(start_depth=self.col_hdr_height)
-        imgs_rview = self.row_gtree.get_elements(start_depth=self.row_hdr_height)
-
-        imgs = np.empty((len(row_header[-1]), len(column_header[-1])),
-                        dtype=object)
-        imgs[::2,:] = np.array(imgs_cview, dtype=object)
-        imgs[:,::2] = np.array(imgs_rview, dtype=object).T
-        for i,j in np.vstack(np.where(np.equal(imgs, None))).T:
-            imgs[i,j] = Spacer(imgs[i-1,j].get_box_width(),
-                               imgs[i,j-1].get_box_height())
-            
+        for element in row_header:
+            row_hdr_group.add(element.to_svg())
         # translate row hdr so that its bottom left corner is
         # on the bottom left corner of the image grid
-        img_bot_y = row_header[-1][0].get_box_bot_y()
-        dy = imgs[-1,0].get_box_bot_y() - img_bot_y
+        hdr_bot_y = row_header[-1].get_box_bot_y()
+        dy = imgs[-1].get_box_bot_y() - hdr_bot_y
         row_hdr_group.translate(tx=0,ty=dy)
-    
         # rotate row hdr by 90 deg. around the bottom left corner of the
         # image grid
-        rot_ctr = (0, img_bot_y)
+        rot_ctr = (0, hdr_bot_y)
         row_hdr_group.rotate(-90, center=rot_ctr)    
         table_group.add(row_hdr_group)
         
         img_group = svgwrite.container.Group(id='table_content')
-        for row_imgs in imgs:
-            for img in row_imgs:
-                img_group.add(img.to_svg())
+        for img in imgs:
+            img_group.add(img.to_svg())
         table_group.add(img_group)
     
         dwg.add(table_group)
@@ -874,4 +1026,5 @@ def dtree_to_svg(dtree, root_path, branch_names, row_branches,
     table.add_spacers(row_base_gap=row_base_gap,
                       col_base_gap=col_base_gap)
     table.adjust_cell_sizes()
+    table.deoverlap()
     return table.to_svg()

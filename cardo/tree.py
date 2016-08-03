@@ -13,6 +13,7 @@ import os.path as op
 import re
 from pprint import pformat
 from itertools import izip
+from collections import OrderedDict
 import logging
 
 logger = logging.getLogger('cardo')
@@ -146,7 +147,7 @@ def file_list_to_tree(files, file_pat):
             branch_names[gidx-1] = gname
         branch_names = [bn for bn in branch_names if bn is not None]
             
-        ftree = {}
+        ftree = OrderedDict()
         for fn in sorted(files):
             m = file_pat.match(fn)
             if m is not None:
@@ -178,7 +179,7 @@ def dtree_from_folder(startpath, file_pattern, max_depth=-1):
           single file to handle with no hierarchy. 
           In this case, dtree cannot be built.
     """
-    tree = {}
+    tree = OrderedDict()
 
     try:
         file_pattern.match('')
@@ -191,6 +192,7 @@ def dtree_from_folder(startpath, file_pattern, max_depth=-1):
     for root, dirs, files in os.walk(startpath, topdown=True):
         logger.info('Parse subfolder: %s', root)
         dirs.sort()
+        logger.info('Found dirs: %s', str(dirs))
         rel_path_parts = op.relpath(root, startpath).split(op.sep)
         depth = len(rel_path_parts)
 

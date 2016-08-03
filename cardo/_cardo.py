@@ -11,6 +11,10 @@ from cardo import graphics
 TABLE_OPT_WIDTH_TO_HEIGHT_RATIO = 1 / (2**.5)
 logger = logging.getLogger('cardo')
 
+#TODO: work with absolute file name everywhere
+#      -> only use relative paths when producing SVG
+#      -> use sodipodi to store both abs and rel paths
+
 def make_table_from_folder(data_path, data_file_pattern, max_depth=-1,
                            level_names=None, row_levels=None,
                            column_levels=None):
@@ -62,9 +66,6 @@ def make_table_from_folder(data_path, data_file_pattern, max_depth=-1,
         SVG string reprensentation of the table
 
     #TODO: TEST level_names, row_levels, column_levels args
-    #TODO: check consistency between given branch names and
-    #      retrieved ones
-    #TODO: TEST gaps
     """
     level_names = level_names or []
 
@@ -98,8 +99,8 @@ def make_table_from_folder(data_path, data_file_pattern, max_depth=-1,
         column_levels = list(set(level_names).difference(row_levels))
                 
     # Forge table with target rows and columns into a SVG document
-    table = graphics.Table.from_dtree(dtree,  data_path, level_names, row_levels,
-                                      column_levels)
+    table = graphics.Table.from_dtree(dtree,  data_path, level_names,
+                                      row_levels, column_levels)
     table.add_spacers()
     table.adjust_cell_sizes()
     table.deoverlap()
