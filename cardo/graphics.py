@@ -25,6 +25,7 @@ from itertools import chain
 
 import numpy as np
 import svgwrite
+import base64
 
 from cardo import tree
 
@@ -230,17 +231,24 @@ class Spacer(BoxedRect):
         return svgwrite.shapes.Rect(insert=self.get_box_coords(),
                                     size=self.get_box_size(),
                                     style='stroke:none;fill:none')
+
+class WrongSVGImgInclusion(Exception):
+    pass
        
 class BoxedImage(BoxedRect):
 
+    IMG_EXT_REL = 'external_relative'
+    IMG_EXT_ABS = 'external_absolute'
+    IMG_EMBED = 'embedded'
+    
     def __init__(self, img_fn, box_x=0, box_y=0, img_w=None, img_h=None,
                  halign=BoxedRect.HALIGN_CENTER, valign=BoxedRect.VALIGN_CENTER):
-
+        
         if not op.exists(img_fn):
             raise ImageFileNotFound()
         
         self.img_fn = img_fn
-
+        
         img_orig_w, img_orig_h = get_image_size(img_fn)
         if img_h is None and img_w is None:
             self.rect_width, self.rect_height = img_orig_w, img_orig_h
@@ -259,10 +267,54 @@ class BoxedImage(BoxedRect):
     def __repr__(self):
         return op.basename(self.img_fn) + super(BoxedImage, self).__repr__()
         
-    def to_svg(self):
-        return svgwrite.image.Image(self.img_fn, insert=self.get_rect_coords(),
-                                    size=(self.rect_width, self.rect_height))
-   
+    def to_svg(self, inclusion=IMG_EXT_ABS, ref_path=None):
+        """
+        Export image to SVG. Image can be linked as absolute or relative 
+        file name, or image can be embedded.
+
+        Args:
+            - inclusion (str in (BoxedImage.IMG_EXT_REL, 
+                                 BoxedImage.IMG_EXT_ABS,
+                                 BoxedImage.IMG_EMBED):
+              Inclusion option for the image:
+                  - BoxedImage.IMG_EXT_REL: use an external link with a relative
+                    path. *ref_path* MUST be provided.
+                  - BoxedImage.IMG_EXT_ABS: use an external link with an absolute
+                    path
+                  - BoxedImage.IMG_EMBED: embed the content of the image file
+                    in the return SVG string
+            - ref_path (str):
+              reference start path to set relative image file name. 
+              Used when inclusion == BoxedImage.IMG_EXT_REL 
+
+        Output: svgwrite.image.Image object
+             SVG representation of the image
+                
+        """
+        extra_attrs = {}
+        if inclusion == BoxedImage.IMG_EXT_ABS:
+            img_fn = op.abspath(self.img_fn)
+        elif inclusion == BoxedImage.IMG_EXT_REL:
+            assert ref_path is not None
+            img_fn = op.relpath(self.img_fn, ref_path)
+            extra_attrs = {'sodipodi:xlink:absref' : op.abspath(self.img_fn)}
+        elif inclusion == BoxedImage.IMG_EMBED:
+            formats = {'.jpg':'jpeg', '.jpeg':'jpeg', '.png':'png'}
+            ext = op.splitext(self.img_fn)[-1]
+            if ext in formats:
+                img_fn = 'data:image/%s;base64,%s' \
+                         %(formats[ext], encode64_img(self.img_fn))
+        else:
+            raise WrongSVGImgInclusion('Wrong inclusion type %s' % inclusion)
+        return svgwrite.image.Image(img_fn, insert=self.get_rect_coords(),
+                                    size=(self.rect_width, self.rect_height),
+                                    debug=False, **extra_attrs)
+
+def encode64_img(img_fn):
+    with open(img_fn) as fimg:
+        encoded_img = base64.b64encode(fimg.read())
+    return encoded_img
+
 def get_image_size(fname):
     """
     Determine the image type of given file name and return its size as
@@ -827,7 +879,7 @@ class Table(object):
         table_group.add(img_group)
     
         dwg.add(table_group)
-        return dwg.tostring()
+        return dwg
 
 
 def dtree_to_table_elements(dtree, root_path, branch_names, row_branches,

@@ -15,9 +15,11 @@ logger = logging.getLogger('cardo')
 #      -> only use relative paths when producing SVG
 #      -> use sodipodi to store both abs and rel paths
 
+
 def make_table_from_folder(data_path, data_file_pattern, max_depth=-1,
                            level_names=None, row_levels=None,
-                           column_levels=None):
+                           column_levels=None,
+                           img_type=graphics.BoxedImage.IMG_EMBED):
     """
     Organize image files found in given folder hierarchy into a n-dimensional
     table and return it as SVG.
