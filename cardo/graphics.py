@@ -698,9 +698,9 @@ class Table(object):
                      self.row_gtree.get_height(), self.col_gtree.get_height())
                              
     @staticmethod
-    def from_dtree(dtree, root_path, branch_names, row_branches,
+    def from_dtree(dtree, branch_names, row_branches,
                    column_branches):
-        return Table(*dtree_to_table_elements(dtree, root_path, branch_names,
+        return Table(*dtree_to_table_elements(dtree, branch_names,
                                               row_branches, column_branches))
 
     def get_col_header_elements(self):
@@ -847,42 +847,52 @@ class Table(object):
         return list(chain(*row_header)), list(chain(*col_header)), \
             list(imgs.flatten())
         
-    def to_svg(self):
+    def to_svg(self, ref_path=None):
 
-        row_header, column_header, imgs = self.get_table_parts()
+        row_header, column_header, grid = self.get_table_parts()
         
         dwg = svgwrite.Drawing()
         table_group = svgwrite.container.Group(id='table')
-
-        col_hdr_group = svgwrite.container.Group(id='table_col_hdr')
-        for element in column_header:
-            col_hdr_group.add(element.to_svg())            
-        table_group.add(col_hdr_group)
-
-        row_hdr_group = svgwrite.container.Group(id='table_row_hdr')
-        for element in row_header:
-            row_hdr_group.add(element.to_svg())
-        # translate row hdr so that its bottom left corner is
-        # on the bottom left corner of the image grid
-        hdr_bot_y = row_header[-1].get_box_bot_y()
-        dy = imgs[-1].get_box_bot_y() - hdr_bot_y
-        row_hdr_group.translate(tx=0,ty=dy)
-        # rotate row hdr by 90 deg. around the bottom left corner of the
-        # image grid
-        rot_ctr = (0, hdr_bot_y)
-        row_hdr_group.rotate(-90, center=rot_ctr)    
-        table_group.add(row_hdr_group)
         
-        img_group = svgwrite.container.Group(id='table_content')
-        for img in imgs:
-            img_group.add(img.to_svg())
-        table_group.add(img_group)
+        if len(column_header) > 0:
+            col_hdr_group = svgwrite.container.Group(id='table_col_hdr')
+            for element in column_header:
+                col_hdr_group.add(element.to_svg())            
+            table_group.add(col_hdr_group)
+
+        if len(row_header) > 0:
+            row_hdr_group = svgwrite.container.Group(id='table_row_hdr')
+            for element in row_header:
+                row_hdr_group.add(element.to_svg())
+            # translate row hdr so that its bottom left corner is
+            # on the bottom left corner of the image grid
+            hdr_bot_y = row_header[-1].get_box_bot_y()
+            dy = grid[-1].get_box_bot_y() - hdr_bot_y
+            row_hdr_group.translate(tx=0,ty=dy)
+            # rotate row hdr by 90 deg. around the bottom left corner of the
+            # image grid
+            rot_ctr = (0, hdr_bot_y)
+            row_hdr_group.rotate(-90, center=rot_ctr)    
+            table_group.add(row_hdr_group)
+            
+        content_group = svgwrite.container.Group(id='table_content')
+        if ref_path is not None:
+            img_inclusion = BoxedImage.IMG_EXT_REL
+        else:
+            img_inclusion = BoxedImage.IMG_EXT_ABS
+        # TODO: handle embedded images
+        for grid_elem in grid:
+            if isinstance(grid_elem, BoxedImage):
+                content_group.add(grid_elem.to_svg(img_inclusion, ref_path))
+            else:
+                content_group.add(grid_elem.to_svg())
+        table_group.add(content_group)
     
         dwg.add(table_group)
         return dwg
 
 
-def dtree_to_table_elements(dtree, root_path, branch_names, row_branches,
+def dtree_to_table_elements(dtree, branch_names, row_branches,
                             column_branches):
     """
     Convert a data tree to a table of images with column and row headers
@@ -904,24 +914,23 @@ def dtree_to_table_elements(dtree, root_path, branch_names, row_branches,
     img_it = tree.tree_leaves_iterator(dtree)
     
     def make_img(img_fn):
-        return BoxedImage(op.join(root_path, img_fn), img_h=img_h)    
+        return BoxedImage(img_fn, img_h=img_h)    
     bimgs = np.array([[make_img(img_it.next()) for icol in xrange(nb_cols)]\
                       for irow in xrange(nb_rows)], dtype=object)
     
     return row_levels, col_levels, bimgs
     
-def dtree_to_svg(dtree, root_path, branch_names, row_branches,
+def dtree_to_svg(dtree, branch_names, row_branches,
                  column_branches, row_base_gap=Table.DEFAULT_ROW_BGAP,
-                 col_base_gap=Table.DEFAULT_COL_BGAP):
+                 col_base_gap=Table.DEFAULT_COL_BGAP, ref_path=None):
     """
     Helper function to directly convert a dtree to a SVG string representation
 
-    See 'dtree_to_table_elements' for doc on arguments
+    TODO: add option to embed images in SVG doc
     """
-    table = Table.from_dtree(dtree, root_path, branch_names,
-                             row_branches, column_branches)
+    table = Table.from_dtree(dtree, branch_names, row_branches, column_branches)
     table.add_spacers(row_base_gap=row_base_gap,
                       col_base_gap=col_base_gap)
     table.adjust_cell_sizes()
     table.deoverlap()
-    return table.to_svg()
+    return table.to_svg(ref_path=ref_path)

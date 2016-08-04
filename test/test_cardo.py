@@ -225,7 +225,7 @@ class TreeTest(CardoTest):
         data_tree, _ = cardo.tree.dtree_from_folder(data_folder,
                                                     'growth_profile.png')
 
-        fpat = 'scenario%d/experiment%d/growth_profile.png'
+        fpat = op.join(data_folder, 'scenario%d/experiment%d/growth_profile.png')
         expected_tree = {'scenario1' : { 'experiment1' : fpat%(1,1),
                                           'experiment2' : fpat%(1,2),
                                           'experiment3' : fpat%(1,3),
@@ -322,7 +322,8 @@ class ElementsTest(CardoTest):
 
         isvg = img.to_svg(inclusion=gfx.BoxedImage.IMG_EXT_REL,
                           ref_path=op.join(self.tmp_dir, 'level1')).tostring()
-        self.assertEquals(get_iattr(isvg, 'xlink:href'), 'level2/test.png')
+        self.assertEquals(op.normpath(get_iattr(isvg, 'xlink:href')),
+                          op.normpath('./level2/test.png'))
 
         isvg = img.to_svg(inclusion=gfx.BoxedImage.IMG_EMBED).tostring()
         img_href = get_iattr(isvg, 'xlink:href')
@@ -515,6 +516,22 @@ class TableTest(CardoTest):
                               (211 * 3 + gfx.Table.DEFAULT_COL_BGAP,
                                gfx.BoxedText.DEFAULT_FONT_H * 3))
 
+    def test_svg_img_inclusion(self):
+
+        col_hdr_levels = [['a', 'b']]
+        imgs_fn = self._create_img_files(['level1/level2/a.png',
+                                          'level1/level2/b.png'])
+        imgs = np.array([[gfx.BoxedImage(ifn) for ifn in imgs_fn]])
+        table = cardo.graphics.Table([], col_hdr_levels, imgs)
+
+        svg = table.to_svg(ref_path = op.join(self.tmp_dir, 'level1'))
+
+        img_elem = svg.elements[-1].elements[-1].elements[0]
+        self.assertEquals(op.normpath(img_elem.attribs['xlink:href']),
+                          'level2/a.png')
+        self.assertEquals(op.normpath(img_elem.attribs['sodipodi:xlink:absref']),
+                          op.normpath(imgs_fn[0]))
+        
 class GTreeTest(CardoTest):
 
     def test_from_hdr_and_images(self):

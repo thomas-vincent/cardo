@@ -138,7 +138,50 @@ class NonMatchingFilePattern(Exception):
     pass
 
 def file_list_to_tree(files, file_pat):
+    """
+    Build a data tree where branches are defined by groups in the given
+    file pattern and leaves are files from the given list of  *files* matching the
+    given file pattern.
 
+    IMPORTANT: the matching files MUST contain all combinations of group values,
+               ie they should include the cartesian product of group values.
+               Example:
+               File pattern is: '(?P<group1>\d{2})_G2(?P<group2>[ab]).png'
+               A valid file list is:
+                         05_a.png,
+                         05_b.png,
+                         03_a.png,
+                         03_b.png.
+               But an invalid file list is:
+                         05_a.png,
+                         05_b.png,
+                         03_a.png,
+                         04_a.png         
+               because the following combinations are missing:
+                         03_b.png
+                         04_b.png
+    
+    Args:
+        - files (list of str):
+            list of files names to filter and set as leaves in the data tree
+        - file_pat (compiled regexp):
+            File pattern defining named groups in the tree and filter for the 
+            input file list.
+            Example: 
+                '(?P<year>\d{4})_X(?P<exp_id>\d{2})_S(?P<subject>_[a-b]{5}).dat'
+                 will match files like: 2016_X02_Sabcde.dat,
+                                        1998_X99_Svwxyz.dat ...
+                 and the capturing groups "year", "exp_id" "subject" define
+                 the branch names in the returned data tree
+     
+    Output: OrderedDict
+         Input files are sorted before parsing
+
+    Example:
+    >>> files = ['2016_X02_Sabcde.dat', 'dummy.txt', '1998_X99_Svwxyz.dat',
+                 '1982_X12_Slecha.dat', '1980_X12_Slecha.dat'
+    >>> file_list_to_tree(
+    """
     if file_pat.groups > 0: # there are groups in the regexp.
                             # File list may actually be represented as
                             # a data tree
@@ -212,16 +255,13 @@ def dtree_from_folder(startpath, file_pattern, max_depth=-1):
             #       for now it's either a single file or a dtree
             #       -> better to unify
             tfiles, bfiles = file_list_to_tree(files, file_pattern)
-
+            
             if len(branches) == 0 and len(bfiles) == 0:
                 raise Exception('Data tree cannot be built from one single file')
 
-            def make_path(fn, rdir):
-                return op.join(op.relpath(rdir, startpath), fn)
-
             if isinstance(tfiles, str):
+                tfiles = op.join(startpath, root, tfiles)
                 logger.info('Found 1 file matching regexp: %s', tfiles)
-                tfiles = make_path(tfiles, root)
                 set_tree_leaf(tree, branches, tfiles)
             else: # dict tree
                 if logger.isEnabledFor(logging.INFO):
@@ -245,8 +285,8 @@ def dtree_from_folder(startpath, file_pattern, max_depth=-1):
                     logger.warning(msg)
                     #raise NonMatchingFilePattern(msg)
                 else:
-                    tfiles = apply_to_leaves(tfiles, make_path, (root,))
                     for bf,fn in tree_items_iterator(tfiles):
+                        fn = op.join(startpath, root, fn)
                         set_tree_leaf(tree, branches+bf, fn)
                 
             dirs[:] = [] #do not go deeper
@@ -277,7 +317,9 @@ def dtree_get_depth(data_tree):
     return _count_levels(data_tree, 0)
 
 def dtree_get_levels(data_tree):
-    # Walk one branch of the tree and gather levels
+    """
+    Walk one branch of the tree and gather keys at each level
+    """
     def _get_levels(t, levels):
         if isinstance(t[t.keys()[0]], dict):
             return _get_levels(t[t.keys()[0]], levels + [t.keys()])

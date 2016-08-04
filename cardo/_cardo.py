@@ -101,8 +101,8 @@ def make_table_from_folder(data_path, data_file_pattern, max_depth=-1,
         column_levels = list(set(level_names).difference(row_levels))
                 
     # Forge table with target rows and columns into a SVG document
-    table = graphics.Table.from_dtree(dtree,  data_path, level_names,
-                                      row_levels, column_levels)
+    table = graphics.Table.from_dtree(dtree, level_names, row_levels,
+                                      column_levels)
     table.add_spacers()
     table.adjust_cell_sizes()
     table.deoverlap()
