@@ -18,8 +18,7 @@ logger = logging.getLogger('cardo')
 
 def make_table_from_folder(data_path, data_file_pattern, max_depth=-1,
                            level_names=None, row_levels=None,
-                           column_levels=None,
-                           img_type=graphics.BoxedImage.IMG_EMBED):
+                           column_levels=None):
     """
     Organize image files found in given folder hierarchy into a n-dimensional
     table and return it as SVG.

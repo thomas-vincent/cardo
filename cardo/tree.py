@@ -128,8 +128,8 @@ def apply_to_leaves(tree, func, func_args=None, func_kwargs=None):
         set_tree_leaf(newTree, branch, func(leaf, *func_args, **func_kwargs))
     return newTree
 
-        
-## Data tree (= UB-tree) functions ##        
+
+## Data tree (= UB-tree) functions ##
 
 class InconsistentFileGroup(Exception):
     pass
@@ -146,7 +146,7 @@ def file_list_to_tree(files, file_pat):
     IMPORTANT: the matching files MUST contain all combinations of group values,
                ie they should include the cartesian product of group values.
                Example:
-               File pattern is: '(?P<group1>\d{2})_G2(?P<group2>[ab]).png'
+               File pattern is: '(?P<group1>[0-9]{2})_G2(?P<group2>[ab]).png'
                A valid file list is:
                          05_a.png,
                          05_b.png,
@@ -168,11 +168,11 @@ def file_list_to_tree(files, file_pat):
             File pattern defining named groups in the tree and filter for the 
             input file list.
             Example: 
-                '(?P<year>\d{4})_X(?P<exp_id>\d{2})_S(?P<subject>_[a-b]{5}).dat'
-                 will match files like: 2016_X02_Sabcde.dat,
-                                        1998_X99_Svwxyz.dat ...
-                 and the capturing groups "year", "exp_id" "subject" define
-                 the branch names in the returned data tree
+              '(?P<year>\d{4})_X(?P<exp_id>[0-9]{2})_S(?P<subject>_[a-b]{5}).dat'
+               will match files like: 2016_X02_Sabcde.dat,
+                                      1998_X99_Svwxyz.dat ...
+               and the capturing groups "year", "exp_id" "subject" define
+               the branch names in the returned data tree
      
     Output: OrderedDict
          Input files are sorted before parsing
@@ -260,7 +260,7 @@ def dtree_from_folder(startpath, file_pattern, max_depth=-1):
                 raise Exception('Data tree cannot be built from one single file')
 
             if isinstance(tfiles, str):
-                tfiles = op.join(startpath, root, tfiles)
+                tfiles = op.join(root, tfiles)
                 logger.info('Found 1 file matching regexp: %s', tfiles)
                 set_tree_leaf(tree, branches, tfiles)
             else: # dict tree
@@ -286,7 +286,7 @@ def dtree_from_folder(startpath, file_pattern, max_depth=-1):
                     #raise NonMatchingFilePattern(msg)
                 else:
                     for bf,fn in tree_items_iterator(tfiles):
-                        fn = op.join(startpath, root, fn)
+                        fn = op.join(root, fn)
                         set_tree_leaf(tree, branches+bf, fn)
                 
             dirs[:] = [] #do not go deeper
@@ -309,9 +309,9 @@ class EmptyDataTree(Exception):
 
 
 def dtree_get_depth(data_tree):
-    def _count_levels(t, count):
-        if isinstance(t[t.keys()[0]], dict):
-            return _count_levels(t[t.keys()[0]], count+1)
+    def _count_levels(tree, count):
+        if isinstance(tree[tree.keys()[0]], dict):
+            return _count_levels(tree[tree.keys()[0]], count+1)
         else:
             return count + 1
     return _count_levels(data_tree, 0)
